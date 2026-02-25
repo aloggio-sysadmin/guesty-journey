@@ -2,7 +2,7 @@
 
 const catalyst = require('zcatalyst-sdk-node');
 
-// Route handlers
+// Route handlers (lazy-loaded)
 let authRoutes, chatRoutes, smeRoutes, techRoutes, processRoutes,
     journeyRoutes, gapsRoutes, conflictsRoutes, projectRoutes, reportsRoutes;
 
@@ -37,6 +37,43 @@ function isAdminRoute(method, path) {
 
 // Public routes (no auth required)
 const PUBLIC_ROUTES = new Set(['POST /auth/login', 'GET /health']);
+
+// ---------------------------------------------------------------------------
+// Response helper — uses native Node.js ServerResponse API
+// ---------------------------------------------------------------------------
+function sendJson(res, statusCode, data) {
+  const body = JSON.stringify(data);
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization'
+  });
+  res.end(body);
+}
+
+// ---------------------------------------------------------------------------
+// Body parser — reads JSON from native Node.js IncomingMessage stream
+// ---------------------------------------------------------------------------
+function parseBody(req) {
+  return new Promise((resolve) => {
+    // GET/HEAD/DELETE usually have no body
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'DELETE') {
+      return resolve({});
+    }
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch (e) {
+        resolve({});
+      }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
 
 // ---------------------------------------------------------------------------
 // URL helpers
@@ -151,56 +188,32 @@ function matchRoute(method, path) {
 }
 
 // ---------------------------------------------------------------------------
-// Body parser for Advanced I/O
+// Main entry point — native Node.js IncomingMessage / ServerResponse
 // ---------------------------------------------------------------------------
-async function parseBody(catalystReq) {
-  try {
-    const raw = typeof catalystReq.getAllParams === 'function'
-      ? catalystReq.getAllParams()
-      : {};
-    return raw || {};
-  } catch (e) {
-    return {};
-  }
-}
+module.exports = async (req, res) => {
+  const app = catalyst.initialize(req);
 
-// ---------------------------------------------------------------------------
-// Main entry point
-// ---------------------------------------------------------------------------
-module.exports = async (catalystReq, catalystRes) => {
-  const app = catalyst.initialize(catalystReq);
-
-  // Normalise method and URL across SDK versions
-  const method = (
-    catalystReq.method ||
-    (typeof catalystReq.getMethod === 'function' ? catalystReq.getMethod() : null) ||
-    'GET'
-  ).toUpperCase();
-
-  const rawUrl =
-    catalystReq.url ||
-    (typeof catalystReq.getURL === 'function' ? catalystReq.getURL() : null) ||
-    '/';
-
-  const path  = parsePath(rawUrl);
-  const query = parseQuery(rawUrl);
+  const method = (req.method || 'GET').toUpperCase();
+  const rawUrl = req.url || '/';
+  const path   = parsePath(rawUrl);
+  const queryParams = parseQuery(rawUrl);
   const routeKey = `${method} ${path}`;
 
   // Handle OPTIONS preflight
   if (method === 'OPTIONS') {
-    catalystRes.status(200).send(JSON.stringify({}));
+    sendJson(res, 200, {});
     return;
   }
 
   try {
-    const body = await parseBody(catalystReq);
+    const body = await parseBody(req);
 
     // Authentication
     let user = null;
     if (!PUBLIC_ROUTES.has(routeKey)) {
       const authHeader =
-        (catalystReq.headers && catalystReq.headers['authorization']) ||
-        (catalystReq.headers && catalystReq.headers['Authorization']);
+        (req.headers && req.headers['authorization']) ||
+        (req.headers && req.headers['Authorization']);
       user = await authMiddleware(app, authHeader);
     }
 
@@ -212,17 +225,17 @@ module.exports = async (catalystReq, catalystRes) => {
     // Dispatch
     const match = matchRoute(method, path);
     if (!match) {
-      catalystRes.status(404).send(JSON.stringify({ error: `Route not found: ${method} ${path}` }));
+      sendJson(res, 404, { error: `Route not found: ${method} ${path}` });
       return;
     }
 
     // handler(catalystApp, urlParams, body, authUser, queryParams)
-    const result = await match.handler(app, match.params, body, user, query);
-    catalystRes.status(200).send(JSON.stringify(result));
+    const result = await match.handler(app, match.params, body, user, queryParams);
+    sendJson(res, 200, result);
 
   } catch (err) {
     console.error(`[ERROR] ${method} ${path}:`, err);
     const status = err.status || err.statusCode || 500;
-    catalystRes.status(status).send(JSON.stringify({ error: err.message || 'Internal server error' }));
+    sendJson(res, status, { error: err.message || 'Internal server error' });
   }
 };
