@@ -86,5 +86,5 @@ export const project = {
 };
 
 export const reports = {
-  generate: (type) => apiCall('GET', `/reports/${type}`),
+  generate: (type) => apiCall('POST', `/reports/${type}`),
 };
