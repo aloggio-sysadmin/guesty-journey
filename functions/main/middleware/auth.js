@@ -4,17 +4,16 @@ const jwt = require('jsonwebtoken');
 const { getConfig } = require('../config');
 
 /**
- * Verifies the JWT from the Authorization header.
+ * Verifies the JWT from the x-auth-token header.
  * Returns the decoded user payload: { user_id, email, role }
  * Throws a 401 error if missing/invalid/expired.
  */
-async function authMiddleware(catalystApp, authHeader) {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+async function authMiddleware(catalystApp, token) {
+  if (!token) {
     const err = new Error('No authorization token provided');
     err.status = 401;
     throw err;
   }
-  const token = authHeader.slice(7);
   const config = await getConfig(catalystApp);
   try {
     const decoded = jwt.verify(token, config.JWT_SECRET);

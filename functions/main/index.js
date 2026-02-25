@@ -46,7 +46,7 @@ function sendJson(res, statusCode, data) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization'
+    'Access-Control-Allow-Headers': 'Content-Type,x-auth-token'
   });
   res.end(body);
 }
@@ -210,10 +210,8 @@ module.exports = async (req, res) => {
     // Authentication
     let user = null;
     if (!PUBLIC_ROUTES.has(routeKey)) {
-      const authHeader =
-        (req.headers && req.headers['authorization']) ||
-        (req.headers && req.headers['Authorization']);
-      user = await authMiddleware(app, authHeader);
+      const authToken = req.headers && req.headers['x-auth-token'];
+      user = await authMiddleware(app, authToken);
     }
 
     // Admin gate
