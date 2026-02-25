@@ -1,0 +1,9 @@
+{
+	"name": "main",
+	"version": "1.0.0",
+	"main": "index.js",
+	"author": "zoho-sysadmin@alloggio.com.au",
+	"dependencies": {
+		"zcatalyst-sdk-node": "latest"
+	}
+}

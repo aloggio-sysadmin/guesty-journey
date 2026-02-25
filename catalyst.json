@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "targets": [
+      "main"
+    ],
+    "ignore": [],
+    "source": "functions"
+  },
+  "client": {
+    "source": "client",
+    "plugin": "zcatalyst-cli-plugin-angular"
+  },
+  "appsail": [
+    {
+      "source": "appsail-nodejs",
+      "name": "AppSail"
+    }
+  ],
+  "slate": [
+    {
+      "name": "angular",
+      "source": "/Users/paulodelapena/Downloads/Journey/angular"
+    }
+  ]
+}
