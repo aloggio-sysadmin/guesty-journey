@@ -25,8 +25,7 @@ const { authMiddleware, requireAdmin } = require('./middleware/auth');
 const ADMIN_EXACT = [
   'POST /auth/register',
   'POST /auth/bulk-import',
-  'GET /auth/users',
-  'POST /admin/seed'
+  'GET /auth/users'
 ];
 
 function isAdminRoute(method, path) {
@@ -36,7 +35,7 @@ function isAdminRoute(method, path) {
 }
 
 // Public routes (no auth required)
-const PUBLIC_ROUTES = new Set(['POST /auth/login', 'GET /health']);
+const PUBLIC_ROUTES = new Set(['POST /auth/login', 'GET /health', 'POST /admin/seed']);
 
 // ---------------------------------------------------------------------------
 // Response helper — uses native Node.js ServerResponse API
