@@ -1,24 +1,228 @@
 'use strict';
 
-const { IncomingMessage, ServerResponse } = require("http");
+const catalyst = require('zcatalyst-sdk-node');
 
-/**
- * 
- * @param {IncomingMessage} req 
- * @param {ServerResponse} res 
- */
-module.exports = (req, res) => {
-	var url = req.url;
+// Route handlers
+let authRoutes, chatRoutes, smeRoutes, techRoutes, processRoutes,
+    journeyRoutes, gapsRoutes, conflictsRoutes, projectRoutes, reportsRoutes;
 
-	switch (url) {
-		case '/':
-			res.writeHead(200, { 'Content-Type': 'text/html' });
-			res.write('<h1>Hello from index.js<h1>');
-			break;
-		default:
-			res.writeHead(404);
-			res.write('You might find the page you are looking for at "/" path');
-			break;
-	}
-	res.end();
+function loadRoutes() {
+  if (!authRoutes) authRoutes = require('./routes/auth');
+  if (!chatRoutes) chatRoutes = require('./routes/chat');
+  if (!smeRoutes) smeRoutes = require('./routes/sme');
+  if (!techRoutes) techRoutes = require('./routes/tech');
+  if (!processRoutes) processRoutes = require('./routes/process');
+  if (!journeyRoutes) journeyRoutes = require('./routes/journey');
+  if (!gapsRoutes) gapsRoutes = require('./routes/gaps');
+  if (!conflictsRoutes) conflictsRoutes = require('./routes/conflicts');
+  if (!projectRoutes) projectRoutes = require('./routes/project');
+  if (!reportsRoutes) reportsRoutes = require('./routes/reports');
+}
+
+const { authMiddleware, requireAdmin } = require('./middleware/auth');
+
+// Admin-only routes
+const ADMIN_EXACT = [
+  'POST /auth/register',
+  'POST /auth/bulk-import',
+  'GET /auth/users',
+  'POST /admin/seed'
+];
+
+function isAdminRoute(method, path) {
+  if (ADMIN_EXACT.includes(`${method} ${path}`)) return true;
+  if (method === 'PUT' && path.startsWith('/auth/users/')) return true;
+  return false;
+}
+
+// Public routes (no auth required)
+const PUBLIC_ROUTES = new Set(['POST /auth/login', 'GET /health']);
+
+// ---------------------------------------------------------------------------
+// URL helpers
+// ---------------------------------------------------------------------------
+function parsePath(rawUrl) {
+  const [pathWithPrefix] = rawUrl.split('?');
+  // Strip Catalyst function prefix /server/main
+  return pathWithPrefix.replace(/^\/server\/main/, '') || '/';
+}
+
+function parseQuery(rawUrl) {
+  const idx = rawUrl.indexOf('?');
+  if (idx === -1) return {};
+  const result = {};
+  for (const part of rawUrl.slice(idx + 1).split('&')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) {
+      if (part) result[decodeURIComponent(part)] = '';
+    } else {
+      result[decodeURIComponent(part.slice(0, eq))] = decodeURIComponent(part.slice(eq + 1));
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Route definition table
+// ---------------------------------------------------------------------------
+function buildRouteTable() {
+  loadRoutes();
+  return [
+    { method: 'GET',  pattern: '/health',                  handler: (_a,_p,_b,_u) => ({ status: 'ok', timestamp: new Date().toISOString() }) },
+    // Auth
+    { method: 'POST', pattern: '/auth/login',               handler: authRoutes.login },
+    { method: 'POST', pattern: '/auth/register',            handler: authRoutes.register },
+    { method: 'POST', pattern: '/auth/bulk-import',         handler: authRoutes.bulkImport },
+    { method: 'GET',  pattern: '/auth/users',               handler: authRoutes.listUsers },
+    { method: 'PUT',  pattern: '/auth/users/:id',           handler: authRoutes.updateUser },
+    // Chat
+    { method: 'POST', pattern: '/chat/start',               handler: chatRoutes.startSession },
+    { method: 'GET',  pattern: '/chat/sessions',            handler: chatRoutes.listSessions },
+    { method: 'GET',  pattern: '/chat/:sessionId',          handler: chatRoutes.resumeSession },
+    { method: 'POST', pattern: '/chat/:sessionId/message',  handler: chatRoutes.sendMessage },
+    { method: 'POST', pattern: '/chat/:sessionId/action',   handler: chatRoutes.quickAction },
+    { method: 'POST', pattern: '/chat/:sessionId/close',    handler: chatRoutes.closeSession },
+    // SME
+    { method: 'POST', pattern: '/sme',                      handler: smeRoutes.create },
+    { method: 'GET',  pattern: '/sme',                      handler: smeRoutes.list },
+    { method: 'GET',  pattern: '/sme/:id',                  handler: smeRoutes.get },
+    { method: 'PUT',  pattern: '/sme/:id',                  handler: smeRoutes.update },
+    { method: 'POST', pattern: '/sme/:id/validate',         handler: smeRoutes.validate },
+    // Tech
+    { method: 'POST', pattern: '/tech',                     handler: techRoutes.create },
+    { method: 'GET',  pattern: '/tech',                     handler: techRoutes.list },
+    { method: 'GET',  pattern: '/tech/:id',                 handler: techRoutes.get },
+    { method: 'PUT',  pattern: '/tech/:id',                 handler: techRoutes.update },
+    // Process
+    { method: 'POST', pattern: '/process',                  handler: processRoutes.create },
+    { method: 'GET',  pattern: '/process',                  handler: processRoutes.list },
+    { method: 'GET',  pattern: '/process/:id',              handler: processRoutes.get },
+    { method: 'PUT',  pattern: '/process/:id',              handler: processRoutes.update },
+    // Journey
+    { method: 'POST', pattern: '/journey',                  handler: journeyRoutes.create },
+    { method: 'GET',  pattern: '/journey',                  handler: journeyRoutes.list },
+    { method: 'GET',  pattern: '/journey/:id',              handler: journeyRoutes.get },
+    { method: 'PUT',  pattern: '/journey/:id',              handler: journeyRoutes.update },
+    // Gaps
+    { method: 'POST', pattern: '/gaps',                     handler: gapsRoutes.create },
+    { method: 'GET',  pattern: '/gaps',                     handler: gapsRoutes.list },
+    { method: 'GET',  pattern: '/gaps/:id',                 handler: gapsRoutes.get },
+    { method: 'PUT',  pattern: '/gaps/:id',                 handler: gapsRoutes.update },
+    // Conflicts
+    { method: 'POST', pattern: '/conflicts',                handler: conflictsRoutes.create },
+    { method: 'GET',  pattern: '/conflicts',                handler: conflictsRoutes.list },
+    { method: 'GET',  pattern: '/conflicts/:id',            handler: conflictsRoutes.get },
+    { method: 'POST', pattern: '/conflicts/:id/resolve',    handler: conflictsRoutes.resolve },
+    // Project
+    { method: 'GET',  pattern: '/project/state',            handler: projectRoutes.getState },
+    { method: 'POST', pattern: '/project/recalculate',      handler: projectRoutes.recalculate },
+    // Reports
+    { method: 'POST', pattern: '/reports/:type',            handler: reportsRoutes.generate },
+    // Admin seed
+    { method: 'POST', pattern: '/admin/seed',               handler: projectRoutes.seed },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Pattern matcher: returns params object or null
+// ---------------------------------------------------------------------------
+function matchPattern(pattern, path) {
+  const pp = pattern.split('/');
+  const pathp = path.split('/');
+  if (pp.length !== pathp.length) return null;
+  const params = {};
+  for (let i = 0; i < pp.length; i++) {
+    if (pp[i].startsWith(':')) {
+      params[pp[i].slice(1)] = decodeURIComponent(pathp[i]);
+    } else if (pp[i] !== pathp[i]) {
+      return null;
+    }
+  }
+  return params;
+}
+
+function matchRoute(method, path) {
+  for (const route of buildRouteTable()) {
+    if (route.method !== method) continue;
+    const params = matchPattern(route.pattern, path);
+    if (params !== null) return { handler: route.handler, params };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Body parser for Advanced I/O
+// ---------------------------------------------------------------------------
+async function parseBody(catalystReq) {
+  try {
+    const raw = typeof catalystReq.getAllParams === 'function'
+      ? catalystReq.getAllParams()
+      : {};
+    return raw || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point
+// ---------------------------------------------------------------------------
+module.exports = async (catalystReq, catalystRes) => {
+  const app = catalyst.initialize(catalystReq);
+
+  // Normalise method and URL across SDK versions
+  const method = (
+    catalystReq.method ||
+    (typeof catalystReq.getMethod === 'function' ? catalystReq.getMethod() : null) ||
+    'GET'
+  ).toUpperCase();
+
+  const rawUrl =
+    catalystReq.url ||
+    (typeof catalystReq.getURL === 'function' ? catalystReq.getURL() : null) ||
+    '/';
+
+  const path  = parsePath(rawUrl);
+  const query = parseQuery(rawUrl);
+  const routeKey = `${method} ${path}`;
+
+  // Handle OPTIONS preflight
+  if (method === 'OPTIONS') {
+    catalystRes.status(200).send(JSON.stringify({}));
+    return;
+  }
+
+  try {
+    const body = await parseBody(catalystReq);
+
+    // Authentication
+    let user = null;
+    if (!PUBLIC_ROUTES.has(routeKey)) {
+      const authHeader =
+        (catalystReq.headers && catalystReq.headers['authorization']) ||
+        (catalystReq.headers && catalystReq.headers['Authorization']);
+      user = await authMiddleware(app, authHeader);
+    }
+
+    // Admin gate
+    if (isAdminRoute(method, path)) {
+      requireAdmin(user);
+    }
+
+    // Dispatch
+    const match = matchRoute(method, path);
+    if (!match) {
+      catalystRes.status(404).send(JSON.stringify({ error: `Route not found: ${method} ${path}` }));
+      return;
+    }
+
+    // handler(catalystApp, urlParams, body, authUser, queryParams)
+    const result = await match.handler(app, match.params, body, user, query);
+    catalystRes.status(200).send(JSON.stringify(result));
+
+  } catch (err) {
+    console.error(`[ERROR] ${method} ${path}:`, err);
+    const status = err.status || err.statusCode || 500;
+    catalystRes.status(status).send(JSON.stringify({ error: err.message || 'Internal server error' }));
+  }
 };

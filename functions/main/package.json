@@ -3,7 +3,47 @@
 	"version": "1.0.0",
 	"main": "index.js",
 	"author": "zoho-sysadmin@alloggio.com.au",
+	"scripts": {
+		"test": "jest",
+		"test:unit": "jest tests/unit",
+		"test:integration": "jest tests/integration",
+		"test:e2e": "jest tests/e2e",
+		"test:coverage": "jest --coverage",
+		"test:watch": "jest --watch"
+	},
+	"jest": {
+		"testEnvironment": "node",
+		"testMatch": [
+			"**/tests/**/*.test.js"
+		],
+		"collectCoverageFrom": [
+			"utils/**/*.js",
+			"services/**/*.js",
+			"routes/**/*.js",
+			"middleware/**/*.js",
+			"config.js"
+		],
+		"coverageThreshold": {
+			"global": {
+				"branches": 60,
+				"functions": 70,
+				"lines": 70,
+				"statements": 70
+			}
+		},
+		"setupFilesAfterEnv": [
+			"./tests/test-utils/setup.js"
+		]
+	},
 	"dependencies": {
+		"@anthropic-ai/sdk": "^0.78.0",
+		"bcryptjs": "^3.0.3",
+		"csv-parse": "^6.1.0",
+		"joi": "^18.0.2",
+		"jsonwebtoken": "^9.0.3",
 		"zcatalyst-sdk-node": "latest"
+	},
+	"devDependencies": {
+		"jest": "^29.7.0"
 	}
 }
