@@ -20,6 +20,18 @@ async function apiCall(method, path, body = null) {
 
 export { apiCall };
 
+async function apiCallPublic(method, path, body = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  const options = { method, headers };
+  if (body) options.body = JSON.stringify(body);
+  const res = await fetch(`${API_BASE}${path}`, options);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+  return data;
+}
+
+export { apiCallPublic };
+
 export const auth = {
   login: (email, password) => apiCall('POST', '/auth/login', { email, password }),
   register: (data) => apiCall('POST', '/auth/register', data),
@@ -43,6 +55,7 @@ export const sme = {
   get: (id) => apiCall('GET', `/sme/${id}`),
   update: (id, data) => apiCall('PUT', `/sme/${id}`, data),
   validate: (id) => apiCall('POST', `/sme/${id}/validate`),
+  sendLink: (id) => apiCall('POST', `/sme/${id}/send-link`),
 };
 
 export const tech = {
@@ -87,4 +100,11 @@ export const project = {
 
 export const reports = {
   generate: (type) => apiCall('POST', `/reports/${type}`),
+};
+
+export const smePublic = {
+  startSession: (token) => apiCallPublic('POST', '/chat/sme-start', { token }),
+  getSession: (sessionId, token) => apiCallPublic('GET', `/chat/sme/${sessionId}?token=${token}`),
+  sendMessage: (sessionId, content, token) => apiCallPublic('POST', `/chat/sme/${sessionId}/message`, { content, token }),
+  close: (sessionId, token) => apiCallPublic('POST', `/chat/sme/${sessionId}/close`, { token }),
 };

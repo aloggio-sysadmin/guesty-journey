@@ -17,6 +17,7 @@ const routes = {
   '#/explore/conflicts':   () => import('./pages/explore-conflicts.js'),
   '#/reports':             () => import('./pages/reports.js'),
   '#/admin/users':         () => import('./pages/admin-users.js'),
+  '#/interview/:token':    () => import('./pages/sme-interview.js'),
 };
 
 function parseHash(hash) {
@@ -50,6 +51,22 @@ async function navigate() {
     content.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
     const mod = await import('./pages/login.js');
     mod.default(content);
+    return;
+  }
+
+  // Handle SME interview page (public, no login required)
+  if (hash.startsWith('#/interview/')) {
+    sidebar.style.display = 'none';
+    content.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+    const match = parseHash(hash);
+    if (match) {
+      try {
+        const mod = await routes[match.pattern]();
+        mod.default(content, match.params);
+      } catch (e) {
+        content.innerHTML = `<div class="page-body"><div class="card"><p style="color:var(--error)">Failed to load: ${e.message}</p></div></div>`;
+      }
+    }
     return;
   }
 

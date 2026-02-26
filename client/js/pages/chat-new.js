@@ -18,6 +18,7 @@ export default async function renderChatNew(container) {
             <div class="form-group"><label>Full Name *</label><input class="form-control" id="sme-name" required></div>
             <div class="form-group"><label>Role *</label><input class="form-control" id="sme-role" required placeholder="e.g. Front Desk Manager"></div>
             <div class="form-group"><label>Department</label><input class="form-control" id="sme-dept" placeholder="e.g. Operations"></div>
+            <div class="form-group"><label>Email</label><input class="form-control" type="email" id="sme-email" placeholder="sme@company.com"></div>
             <div class="form-group"><label>Location</label><input class="form-control" id="sme-loc"></div>
             <div class="form-group"><label>Journey Stages</label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
@@ -56,11 +57,13 @@ export default async function renderChatNew(container) {
   container.querySelector('#new-sme-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const stages = [...container.querySelectorAll('input[name="stage"]:checked')].map(c => c.value);
+    const sme_email = container.querySelector('#sme-email').value.trim();
     await startSession({
       sme_name: container.querySelector('#sme-name').value,
       sme_role: container.querySelector('#sme-role').value,
       sme_department: container.querySelector('#sme-dept').value,
       sme_location: container.querySelector('#sme-loc').value,
+      sme_email: sme_email || undefined,
       journey_stages: stages
     });
   });
