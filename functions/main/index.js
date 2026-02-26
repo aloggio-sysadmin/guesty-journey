@@ -31,11 +31,19 @@ const ADMIN_EXACT = [
 function isAdminRoute(method, path) {
   if (ADMIN_EXACT.includes(`${method} ${path}`)) return true;
   if (method === 'PUT' && path.startsWith('/auth/users/')) return true;
+  if (method === 'POST' && path.match(/^\/sme\/[^/]+\/send-link$/)) return true;
   return false;
 }
 
 // Public routes (no auth required)
 const PUBLIC_ROUTES = new Set(['POST /auth/login', 'GET /health', 'POST /admin/seed']);
+
+// SME self-service routes are public (authenticated via token in body/query)
+function isSmePublicRoute(method, path) {
+  if (method === 'POST' && path === '/chat/sme-start') return true;
+  if (path.startsWith('/chat/sme/')) return true;
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Response helper — uses native Node.js ServerResponse API
@@ -114,6 +122,12 @@ function buildRouteTable() {
     // Chat
     { method: 'POST', pattern: '/chat/start',               handler: chatRoutes.startSession },
     { method: 'GET',  pattern: '/chat/sessions',            handler: chatRoutes.listSessions },
+    // SME self-service chat (must be before /chat/:sessionId to avoid conflicts)
+    { method: 'POST', pattern: '/chat/sme-start',                  handler: chatRoutes.startSmeSession },
+    { method: 'GET',  pattern: '/chat/sme/:sessionId',             handler: chatRoutes.resumeSmeSession },
+    { method: 'POST', pattern: '/chat/sme/:sessionId/message',     handler: chatRoutes.sendSmeMessage },
+    { method: 'POST', pattern: '/chat/sme/:sessionId/close',       handler: chatRoutes.closeSmeSession },
+    // Regular chat
     { method: 'GET',  pattern: '/chat/:sessionId',          handler: chatRoutes.resumeSession },
     { method: 'POST', pattern: '/chat/:sessionId/message',  handler: chatRoutes.sendMessage },
     { method: 'POST', pattern: '/chat/:sessionId/action',   handler: chatRoutes.quickAction },
@@ -124,6 +138,7 @@ function buildRouteTable() {
     { method: 'GET',  pattern: '/sme/:id',                  handler: smeRoutes.get },
     { method: 'PUT',  pattern: '/sme/:id',                  handler: smeRoutes.update },
     { method: 'POST', pattern: '/sme/:id/validate',         handler: smeRoutes.validate },
+    { method: 'POST', pattern: '/sme/:id/send-link',        handler: smeRoutes.sendLink },
     // Tech
     { method: 'POST', pattern: '/tech',                     handler: techRoutes.create },
     { method: 'GET',  pattern: '/tech',                     handler: techRoutes.list },
@@ -209,7 +224,7 @@ module.exports = async (req, res) => {
 
     // Authentication
     let user = null;
-    if (!PUBLIC_ROUTES.has(routeKey)) {
+    if (!PUBLIC_ROUTES.has(routeKey) && !isSmePublicRoute(method, path)) {
       const authToken = req.headers && req.headers['x-auth-token'];
       user = await authMiddleware(app, authToken);
     }

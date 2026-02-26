@@ -3,7 +3,8 @@
 const { query, insert, update, getByField, getAllByField } = require('../utils/data-store');
 const { generateId } = require('../utils/id-generator');
 const { safeParse, safeStringify } = require('../utils/json-helpers');
-const { validate, startSessionSchema, sendMessageSchema, quickActionSchema } = require('../utils/validators');
+const { validate, startSessionSchema, sendMessageSchema, quickActionSchema, smeSessionStartSchema, smeSessionMessageSchema } = require('../utils/validators');
+const { verifySmeToken } = require('../middleware/auth');
 const { processMessage } = require('../services/conversation-engine');
 const { callClaudeForSummary } = require('../services/claude-client');
 const { buildSystemPrompt } = require('../prompts/system-prompt');
@@ -347,4 +348,168 @@ async function closeSession(catalystApp, params, body, user) {
   };
 }
 
-module.exports = { startSession, listSessions, resumeSession, sendMessage, quickAction, closeSession };
+// ── SME Self-Service Endpoints ────────────────────────────────────────────
+
+// POST /chat/sme-start
+async function startSmeSession(catalystApp, params, body) {
+  const { error, value } = validate(smeSessionStartSchema, body);
+  if (error) { const e = new Error(error); e.status = 400; throw e; }
+
+  const tokenData = await verifySmeToken(catalystApp, value.token);
+  const sme_id = tokenData.sme_id;
+
+  // Check if there's already an active session for this SME from a link
+  const existingSessions = await getAllByField(catalystApp, 'Sessions', 'sme_id', sme_id);
+  const activeSession = existingSessions.find(s => s.status === 'active' && s.method === 'sme_self_service');
+  if (activeSession) {
+    // Resume existing session instead of creating new
+    return resumeSmeSession(catalystApp, { sessionId: activeSession.session_id }, { token: value.token });
+  }
+
+  const sme = await getByField(catalystApp, 'SMERegister', 'sme_id', sme_id);
+  if (!sme) { const e = new Error('SME not found'); e.status = 404; throw e; }
+
+  const stagesOwned = safeParse(sme.journey_stages_owned_json, []);
+  const initialStage = Array.isArray(stagesOwned) && stagesOwned.length > 0
+    ? stagesOwned[0]
+    : 'discovery';
+
+  const session_id = await generateId(catalystApp, 'SESSION');
+  const now = new Date().toISOString();
+
+  const initialState = {
+    current_stage: initialStage,
+    current_topic: '',
+    topics_covered: [],
+    topics_remaining: stagesOwned.slice(1),
+    should_move_to_next_stage: false,
+    stage_completion_estimate: 0
+  };
+
+  await insert(catalystApp, 'Sessions', {
+    session_id,
+    sme_id,
+    interviewer_user_id: '',
+    session_date: now,
+    duration_minutes: 0,
+    method: 'sme_self_service',
+    summary: '',
+    conversation_state_json: safeStringify(initialState),
+    status: 'active',
+    created_at: now,
+    closed_at: ''
+  });
+
+  const config = await getConfig(catalystApp);
+  const hydrateSme = {
+    ...sme,
+    journey_stages_owned_json: stagesOwned,
+    domains_json: safeParse(sme.domains_json, []),
+    systems_used_json: safeParse(sme.systems_used_json, [])
+  };
+
+  const systemPrompt = buildSystemPrompt({
+    sme: hydrateSme,
+    sessionState: initialState,
+    existingRecords: { systems: [], processes: [], gaps: [] },
+    openConflicts: [],
+    openQuestions: []
+  });
+
+  const openingMessages = [{
+    role: 'user',
+    content: `SESSION_START: Begin the interview. Greet the SME warmly and ask your first question about the ${initialStage} stage.`
+  }];
+
+  const claudeResponse = await callClaudeForSummary(systemPrompt, openingMessages, config);
+  const reply = claudeResponse.reply || claudeResponse;
+
+  const msgId = await generateId(catalystApp, 'MSG');
+  await insert(catalystApp, 'ChatHistory', {
+    message_id: msgId,
+    session_id,
+    role: 'agent',
+    content: typeof reply === 'string' ? reply : JSON.stringify(reply),
+    extractions_json: safeStringify(claudeResponse.extractions || {}),
+    conflicts_json: '[]',
+    open_questions_json: '[]',
+    conversation_state_json: safeStringify(claudeResponse.conversation_state || initialState),
+    chat_history_timestamp: new Date().toISOString()
+  });
+
+  try {
+    await update(catalystApp, 'SMERegister', sme.ROWID, {
+      interview_status: 'in_progress',
+      updated_at: new Date().toISOString()
+    });
+  } catch (e) { /* non-fatal */ }
+
+  return {
+    session_id,
+    sme: { full_name: sme.full_name, role: sme.role, department: sme.department },
+    opening_message: typeof reply === 'string' ? reply : (claudeResponse.reply || ''),
+    conversation_state: claudeResponse.conversation_state || initialState
+  };
+}
+
+// GET /chat/sme/:sessionId
+async function resumeSmeSession(catalystApp, params, body, user, queryParams) {
+  const token = body?.token || queryParams?.token;
+  const tokenData = await verifySmeToken(catalystApp, token);
+
+  const session = await getByField(catalystApp, 'Sessions', 'session_id', params.sessionId);
+  if (!session) { const e = new Error('Session not found'); e.status = 404; throw e; }
+  if (session.sme_id !== tokenData.sme_id) { const e = new Error('Access denied'); e.status = 403; throw e; }
+
+  const sme = await getByField(catalystApp, 'SMERegister', 'sme_id', session.sme_id);
+
+  const chatRows = await getAllByField(catalystApp, 'ChatHistory', 'session_id', params.sessionId);
+  chatRows.sort((a, b) => (a.chat_history_timestamp || '').localeCompare(b.chat_history_timestamp || ''));
+
+  const messages = chatRows.map(row => ({
+    message_id: row.message_id,
+    role: row.role,
+    content: row.content,
+    timestamp: row.chat_history_timestamp
+  }));
+
+  return {
+    session_id: session.session_id,
+    status: session.status,
+    sme: sme ? { full_name: sme.full_name, role: sme.role, department: sme.department } : null,
+    messages,
+    conversation_state: safeParse(session.conversation_state_json, {})
+  };
+}
+
+// POST /chat/sme/:sessionId/message
+async function sendSmeMessage(catalystApp, params, body) {
+  const { error, value } = validate(smeSessionMessageSchema, body);
+  if (error) { const e = new Error(error); e.status = 400; throw e; }
+
+  const tokenData = await verifySmeToken(catalystApp, value.token);
+
+  const session = await getByField(catalystApp, 'Sessions', 'session_id', params.sessionId);
+  if (!session) { const e = new Error('Session not found'); e.status = 404; throw e; }
+  if (session.sme_id !== tokenData.sme_id) { const e = new Error('Access denied'); e.status = 403; throw e; }
+  if (session.status === 'closed') { const e = new Error('Session is closed'); e.status = 400; throw e; }
+
+  return processMessage(catalystApp, params.sessionId, value.content, '');
+}
+
+// POST /chat/sme/:sessionId/close
+async function closeSmeSession(catalystApp, params, body) {
+  const token = body?.token;
+  const tokenData = await verifySmeToken(catalystApp, token);
+
+  const session = await getByField(catalystApp, 'Sessions', 'session_id', params.sessionId);
+  if (!session) { const e = new Error('Session not found'); e.status = 404; throw e; }
+  if (session.sme_id !== tokenData.sme_id) { const e = new Error('Access denied'); e.status = 403; throw e; }
+
+  return closeSession(catalystApp, params, body, null);
+}
+
+module.exports = {
+  startSession, listSessions, resumeSession, sendMessage, quickAction, closeSession,
+  startSmeSession, resumeSmeSession, sendSmeMessage, closeSmeSession
+};

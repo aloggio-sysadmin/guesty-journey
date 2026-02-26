@@ -1,9 +1,11 @@
 'use strict';
 
+const jwt = require('jsonwebtoken');
 const { query, insert, update, getByField, getAllByField } = require('../utils/data-store');
 const { generateId } = require('../utils/id-generator');
 const { safeParse, safeStringify } = require('../utils/json-helpers');
 const { validate, smeCreateSchema, smeUpdateSchema } = require('../utils/validators');
+const { getConfig } = require('../config');
 
 function parseSme(row) {
   if (!row) return null;
@@ -35,7 +37,7 @@ async function create(catalystApp, params, body, user) {
     journey_stages_owned_json: safeStringify(value.journey_stages_owned_json || []),
     systems_used_json: safeStringify(value.systems_used_json || []),
     interview_status: 'pending',
-    validated_by_sme: false,
+    validated_by_sme: 'false',
     validation_date: '',
     created_by: user ? user.user_id : '',
     created_at: now,
@@ -104,7 +106,7 @@ async function validate_sme(catalystApp, params, body, user) {
   if (!row) { const e = new Error('SME not found'); e.status = 404; throw e; }
 
   const updates = {
-    validated_by_sme: true,
+    validated_by_sme: 'true',
     validation_date: new Date().toISOString(),
     interview_status: 'validated',
     updated_at: new Date().toISOString()
@@ -113,4 +115,62 @@ async function validate_sme(catalystApp, params, body, user) {
   return parseSme({ ...row, ...updates });
 }
 
-module.exports = { create, list, get, update: update_sme, validate: validate_sme };
+// POST /sme/:id/send-link
+async function sendLink(catalystApp, params, body, user) {
+  const row = await getByField(catalystApp, 'SMERegister', 'sme_id', params.id);
+  if (!row) { const e = new Error('SME not found'); e.status = 404; throw e; }
+
+  const contact = safeParse(row.contact_json, {});
+  const email = contact.email;
+  if (!email) {
+    const e = new Error('SME has no email address. Please add an email before sending a link.');
+    e.status = 400;
+    throw e;
+  }
+
+  const config = await getConfig(catalystApp);
+
+  // Generate a 72-hour token scoped to this SME
+  const token = jwt.sign(
+    { sme_id: params.id, purpose: 'sme_interview' },
+    config.JWT_SECRET,
+    { expiresIn: '72h' }
+  );
+
+  // Build the interview link
+  const domain = 'journey-7003032339.development.catalystserverless.com';
+  const link = `https://${domain}/app/index.html#/interview/${token}`;
+
+  // Send email via Catalyst
+  try {
+    const emailService = catalystApp.email();
+    await emailService.sendMail({
+      from_email: 'support@journey-7003032339.development.catalystserverless.com',
+      to_email: email,
+      subject: 'Journey Mapping Interview — Your Session Link',
+      content: `<html><body style="font-family:sans-serif;color:#1e293b;padding:20px">
+        <h2>Guest Journey Mapping Interview</h2>
+        <p>Hi ${row.full_name},</p>
+        <p>You've been invited to participate in a guest journey mapping interview. Click the link below to start your session:</p>
+        <p style="margin:24px 0"><a href="${link}" style="background:#3b82f6;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Start Interview</a></p>
+        <p style="color:#64748b;font-size:13px">This link expires in 72 hours. If you have any questions, contact your project coordinator.</p>
+        <p style="color:#94a3b8;font-size:12px;margin-top:32px">Journey Mapping Agent</p>
+      </body></html>`
+    });
+  } catch (emailErr) {
+    console.error('[sme] Email send error:', emailErr.message);
+    const e = new Error('Failed to send email: ' + emailErr.message);
+    e.status = 500;
+    throw e;
+  }
+
+  // Update SME status
+  await update(catalystApp, 'SMERegister', row.ROWID, {
+    interview_status: 'link_sent',
+    updated_at: new Date().toISOString()
+  });
+
+  return { success: true, message: `Interview link sent to ${email}` };
+}
+
+module.exports = { create, list, get, update: update_sme, validate: validate_sme, sendLink };

@@ -36,7 +36,7 @@ async function create(catalystApp, params, body, user) {
     guest_impact: value.guest_impact || 'medium',
     business_impact: value.business_impact || '',
     financial_impact_estimate: value.financial_impact_estimate || '',
-    confirmed_by_multiple_smes: false,
+    confirmed_by_multiple_smes: 'false',
     conflict_with_sme_ids_json: '[]',
     opportunity_json: safeStringify(value.opportunity_json || {}),
     status: value.status || 'open',

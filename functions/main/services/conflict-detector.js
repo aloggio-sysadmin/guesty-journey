@@ -54,7 +54,7 @@ async function processConflicts(catalystApp, conflictsDetected, smeId, userId) {
               ? `${process.conflict_notes}; ${conflict_id}`
               : conflict_id;
             await update(catalystApp, 'ProcessInventory', process.ROWID, {
-              conflict_flag: true,
+              conflict_flag: 'true',
               conflict_notes: notes,
               updated_at: new Date().toISOString()
             });

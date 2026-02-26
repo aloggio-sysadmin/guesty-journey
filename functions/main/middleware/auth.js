@@ -36,4 +36,31 @@ function requireAdmin(user) {
   }
 }
 
-module.exports = { authMiddleware, requireAdmin };
+/**
+ * Verifies a JWT token issued for SME self-service interviews.
+ * Returns { sme_id } on success, throws 401 on failure.
+ */
+async function verifySmeToken(catalystApp, token) {
+  if (!token) {
+    const err = new Error('No interview token provided');
+    err.status = 401;
+    throw err;
+  }
+  const config = await getConfig(catalystApp);
+  try {
+    const decoded = jwt.verify(token, config.JWT_SECRET);
+    if (decoded.purpose !== 'sme_interview') {
+      const err = new Error('Invalid token purpose');
+      err.status = 401;
+      throw err;
+    }
+    return { sme_id: decoded.sme_id };
+  } catch (e) {
+    if (e.status) throw e;
+    const err = new Error('Invalid or expired interview link');
+    err.status = 401;
+    throw err;
+  }
+}
+
+module.exports = { authMiddleware, requireAdmin, verifySmeToken };

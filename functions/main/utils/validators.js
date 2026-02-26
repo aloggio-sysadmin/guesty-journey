@@ -140,6 +140,15 @@ const conflictResolveSchema = Joi.object({
   resolution_notes: Joi.string().required()
 });
 
+const smeSessionStartSchema = Joi.object({
+  token: Joi.string().required()
+});
+
+const smeSessionMessageSchema = Joi.object({
+  content: Joi.string().max(5000).required(),
+  token: Joi.string().required()
+});
+
 function validate(schema, data) {
   const result = schema.validate(data, { abortEarly: false, allowUnknown: false, stripUnknown: true });
   return { error: result.error ? result.error.details.map(d => d.message).join('; ') : null, value: result.value };
@@ -154,5 +163,6 @@ module.exports = {
   processCreateSchema, processUpdateSchema,
   journeyCreateSchema, journeyUpdateSchema,
   gapCreateSchema, gapUpdateSchema,
-  conflictCreateSchema, conflictResolveSchema
+  conflictCreateSchema, conflictResolveSchema,
+  smeSessionStartSchema, smeSessionMessageSchema
 };
