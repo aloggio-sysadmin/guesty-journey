@@ -7,11 +7,7 @@ const { validate, conflictCreateSchema, conflictResolveSchema } = require('../ut
 
 function parseConflict(row) {
   if (!row) return null;
-  return {
-    ...row,
-    related_process_ids_json: safeParse(row.related_process_ids_json, []),
-    related_gap_ids_json: safeParse(row.related_gap_ids_json, [])
-  };
+  return { ...row };
 }
 
 // POST /conflicts
@@ -24,20 +20,21 @@ async function create(catalystApp, params, body, user) {
 
   const row = await insert(catalystApp, 'ConflictLog', {
     conflict_id,
-    type: value.type,
+    conflict_type: value.type || value.conflict_type || 'data_inconsistency',
     description: value.description,
+    journey_stage: value.journey_stage || '',
+    process_id: value.process_id || '',
     sme_a_id: value.sme_a_id,
-    sme_a_version: value.sme_a_version || '',
     sme_b_id: value.sme_b_id || '',
-    sme_b_version: value.sme_b_version || '',
-    related_process_ids_json: safeStringify(value.related_process_ids_json || []),
-    related_gap_ids_json: safeStringify(value.related_gap_ids_json || []),
-    resolution_status: 'unresolved',
+    sme_a_claim: value.sme_a_version || value.sme_a_claim || '',
+    sme_b_claim: value.sme_b_version || value.sme_b_claim || '',
+    status: 'open',
+    resolution_method: '',
     resolution_notes: '',
     resolved_by: '',
-    resolved_date: '',
     created_by: user ? user.user_id : '',
-    created_at: now
+    created_at: now,
+    updated_at: now
   });
 
   return parseConflict(row);
@@ -47,8 +44,10 @@ async function create(catalystApp, params, body, user) {
 async function list(catalystApp, params, body, user, queryParams) {
   let sql = 'SELECT * FROM ConflictLog';
   const conditions = [];
-  if (queryParams && queryParams.resolution_status) conditions.push(`resolution_status = '${queryParams.resolution_status}'`);
-  if (queryParams && queryParams.type) conditions.push(`type = '${queryParams.type}'`);
+  if (queryParams && queryParams.status) conditions.push(`status = '${queryParams.status}'`);
+  if (queryParams && queryParams.resolution_status) conditions.push(`status = '${queryParams.resolution_status === 'unresolved' ? 'open' : queryParams.resolution_status}'`);
+  if (queryParams && queryParams.type) conditions.push(`conflict_type = '${queryParams.type}'`);
+  if (queryParams && queryParams.conflict_type) conditions.push(`conflict_type = '${queryParams.conflict_type}'`);
   if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
   const rows = await query(catalystApp, sql);
   return rows.map(parseConflict);
@@ -70,10 +69,11 @@ async function resolve(catalystApp, params, body, user) {
   if (!row) { const e = new Error('Conflict not found'); e.status = 404; throw e; }
 
   const updates = {
-    resolution_status: 'resolved',
+    status: 'resolved',
     resolution_notes: value.resolution_notes,
     resolved_by: user ? user.user_id : '',
-    resolved_date: new Date().toISOString()
+    resolution_method: 'manual',
+    updated_at: new Date().toISOString()
   };
 
   const updated = await update(catalystApp, 'ConflictLog', row.ROWID, updates);

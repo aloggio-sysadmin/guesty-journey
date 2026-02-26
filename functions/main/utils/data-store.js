@@ -22,12 +22,24 @@ async function query(catalystApp, zcqlQuery) {
 
 async function insert(catalystApp, tableName, rowData) {
   const table = catalystApp.datastore().table(tableName);
-  return table.insertRow(rowData);
+  try {
+    return await table.insertRow(rowData);
+  } catch (err) {
+    const cols = Object.keys(rowData).join(', ');
+    console.error(`[data-store] INSERT ${tableName} failed. Columns: [${cols}]. Error: ${err.message}`);
+    throw err;
+  }
 }
 
 async function update(catalystApp, tableName, rowId, rowData) {
   const table = catalystApp.datastore().table(tableName);
-  return table.updateRow({ ROWID: rowId, ...rowData });
+  try {
+    return await table.updateRow({ ROWID: rowId, ...rowData });
+  } catch (err) {
+    const cols = Object.keys(rowData).join(', ');
+    console.error(`[data-store] UPDATE ${tableName} (ROWID=${rowId}) failed. Columns: [${cols}]. Error: ${err.message}`);
+    throw err;
+  }
 }
 
 async function deleteRow(catalystApp, tableName, rowId) {
