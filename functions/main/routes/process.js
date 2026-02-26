@@ -33,7 +33,7 @@ async function autoCreateDiscrepancyGap(catalystApp, process, userId) {
     guest_impact: 'medium',
     business_impact: '',
     financial_impact_estimate: '',
-    confirmed_by_multiple_smes: false,
+    confirmed_by_multiple_smes: 'false',
     conflict_with_sme_ids_json: '[]',
     opportunity_json: '{}',
     status: 'open',
@@ -68,10 +68,10 @@ async function create(catalystApp, params, body, user) {
     maturity: value.maturity || 'ad_hoc',
     as_documented: value.as_documented || '',
     as_practiced: value.as_practiced || '',
-    discrepancy_flag: hasDiscrepancy,
+    discrepancy_flag: String(hasDiscrepancy),
     discrepancy_notes: hasDiscrepancy ? 'Auto-detected: documented vs practiced differ' : '',
     source_sme_ids_json: safeStringify(value.source_sme_ids_json || []),
-    conflict_flag: false,
+    conflict_flag: 'false',
     conflict_notes: '',
     created_by: user ? user.user_id : '',
     created_at: now,
@@ -125,7 +125,7 @@ async function update_process(catalystApp, params, body, user) {
   const asDoc = updates.as_documented || row.as_documented;
   const asPrac = updates.as_practiced || row.as_practiced;
   const hasDiscrepancy = asDoc && asPrac && asDoc.trim() !== asPrac.trim();
-  updates.discrepancy_flag = hasDiscrepancy;
+  updates.discrepancy_flag = String(hasDiscrepancy);
   if (hasDiscrepancy) updates.discrepancy_notes = 'Auto-detected: documented vs practiced differ';
 
   const updated = await update(catalystApp, 'ProcessInventory', row.ROWID, updates);

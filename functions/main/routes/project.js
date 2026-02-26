@@ -61,7 +61,7 @@ async function recalculate(catalystApp) {
     query(catalystApp, 'SELECT * FROM ProcessInventory'),
     query(catalystApp, 'SELECT * FROM GapRegister'),
     query(catalystApp, "SELECT * FROM GapRegister WHERE status = 'resolved'"),
-    query(catalystApp, "SELECT * FROM ConflictLog WHERE resolution_status = 'unresolved'")
+    query(catalystApp, "SELECT * FROM ConflictLog WHERE status = 'open'")
   ]);
 
   const completion = {

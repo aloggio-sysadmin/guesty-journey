@@ -52,7 +52,7 @@ async function processMessage(catalystApp, sessionId, userMessage, userId) {
     query(catalystApp, 'SELECT * FROM TechEcosystem'),
     query(catalystApp, `SELECT * FROM ProcessInventory WHERE journey_stage = '${currentStage}'`),
     query(catalystApp, 'SELECT * FROM GapRegister WHERE status = \'open\''),
-    sme ? query(catalystApp, `SELECT * FROM ConflictLog WHERE resolution_status = 'unresolved' AND (sme_a_id = '${sme.sme_id}' OR sme_b_id = '${sme.sme_id}')`) : []
+    sme ? query(catalystApp, `SELECT * FROM ConflictLog WHERE status = 'open' AND (sme_a_id = '${sme.sme_id}' OR sme_b_id = '${sme.sme_id}')`) : []
   ]);
 
   // Load open questions from ProjectState

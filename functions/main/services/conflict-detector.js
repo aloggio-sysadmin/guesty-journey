@@ -19,34 +19,35 @@ async function processConflicts(catalystApp, conflictsDetected, smeId, userId) {
       const now = new Date().toISOString();
 
       // Determine conflict type
-      let type = 'data_inconsistency';
+      let conflictType = 'data_inconsistency';
       const field = (conflict.field || '').toLowerCase();
-      if (field.includes('process') || field.includes('step')) type = 'process_discrepancy';
-      else if (field.includes('system') || field.includes('tech')) type = 'technology_mismatch';
-      else if (field.includes('owner') || field.includes('responsible')) type = 'ownership_dispute';
+      if (field.includes('process') || field.includes('step')) conflictType = 'process_discrepancy';
+      else if (field.includes('system') || field.includes('tech')) conflictType = 'technology_mismatch';
+      else if (field.includes('owner') || field.includes('responsible')) conflictType = 'ownership_dispute';
 
       await insert(catalystApp, 'ConflictLog', {
         conflict_id,
-        type,
+        conflict_type: conflictType,
         description: `${conflict.field}: Current SME says "${conflict.new_value_from_current_sme}", existing data says "${conflict.existing_value}"`,
+        journey_stage: '',
+        process_id: conflict.existing_record_id || '',
         sme_a_id: smeId,
-        sme_a_version: conflict.new_value_from_current_sme || '',
         sme_b_id: conflict.existing_sme_id || '',
-        sme_b_version: conflict.existing_value || '',
-        related_process_ids_json: conflict.existing_record_id ? safeStringify([conflict.existing_record_id]) : '[]',
-        related_gap_ids_json: '[]',
-        resolution_status: 'unresolved',
+        sme_a_claim: conflict.new_value_from_current_sme || '',
+        sme_b_claim: conflict.existing_value || '',
+        status: 'open',
+        resolution_method: '',
         resolution_notes: '',
         resolved_by: '',
-        resolved_date: '',
         created_by: userId,
-        created_at: now
+        created_at: now,
+        updated_at: now
       });
 
       savedConflicts.push(conflict_id);
 
       // Flag related process if applicable
-      if (type === 'process_discrepancy' && conflict.existing_record_id) {
+      if (conflictType === 'process_discrepancy' && conflict.existing_record_id) {
         try {
           const process = await getByField(catalystApp, 'ProcessInventory', 'process_id', conflict.existing_record_id);
           if (process) {
