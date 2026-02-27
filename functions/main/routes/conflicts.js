@@ -20,14 +20,14 @@ async function create(catalystApp, params, body, user) {
 
   const row = await insert(catalystApp, 'ConflictLog', {
     conflict_id,
-    conflict_type: value.type || value.conflict_type || 'data_inconsistency',
+    conflict_type: value.conflict_type || 'data_inconsistency',
     description: value.description,
     journey_stage: value.journey_stage || '',
     process_id: value.process_id || '',
     sme_a_id: value.sme_a_id,
     sme_b_id: value.sme_b_id || '',
-    sme_a_claim: value.sme_a_version || value.sme_a_claim || '',
-    sme_b_claim: value.sme_b_version || value.sme_b_claim || '',
+    sme_a_claim: value.sme_a_claim || '',
+    sme_b_claim: value.sme_b_claim || '',
     status: 'open',
     resolution_method: '',
     resolution_notes: '',

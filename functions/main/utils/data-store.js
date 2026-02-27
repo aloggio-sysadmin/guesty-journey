@@ -26,8 +26,10 @@ async function insert(catalystApp, tableName, rowData) {
     return await table.insertRow(rowData);
   } catch (err) {
     const cols = Object.keys(rowData).join(', ');
-    console.error(`[data-store] INSERT ${tableName} failed. Columns: [${cols}]. Error: ${err.message}`);
-    throw err;
+    const enhanced = new Error(`[INSERT ${tableName}] ${err.message} — Columns: [${cols}]`);
+    enhanced.statusCode = err.statusCode || 500;
+    console.error(`[data-store] ${enhanced.message}`);
+    throw enhanced;
   }
 }
 
@@ -37,8 +39,10 @@ async function update(catalystApp, tableName, rowId, rowData) {
     return await table.updateRow({ ROWID: rowId, ...rowData });
   } catch (err) {
     const cols = Object.keys(rowData).join(', ');
-    console.error(`[data-store] UPDATE ${tableName} (ROWID=${rowId}) failed. Columns: [${cols}]. Error: ${err.message}`);
-    throw err;
+    const enhanced = new Error(`[UPDATE ${tableName} ROWID=${rowId}] ${err.message} — Columns: [${cols}]`);
+    enhanced.statusCode = err.statusCode || 500;
+    console.error(`[data-store] ${enhanced.message}`);
+    throw enhanced;
   }
 }
 

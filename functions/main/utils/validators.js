@@ -126,15 +126,12 @@ const gapUpdateSchema = gapCreateSchema.fork(
 );
 
 const conflictCreateSchema = Joi.object({
-  type: Joi.string().valid('process_discrepancy','data_inconsistency','technology_mismatch','ownership_dispute','system_discrepancy','other').optional(),
   conflict_type: Joi.string().valid('process_discrepancy','data_inconsistency','technology_mismatch','ownership_dispute','system_discrepancy','other').optional(),
   description: Joi.string().required(),
   journey_stage: Joi.string().optional().allow(''),
   process_id: Joi.string().optional().allow(''),
   sme_a_id: Joi.string().required(),
   sme_b_id: Joi.string().optional().allow(''),
-  sme_a_version: Joi.string().optional().allow(''),
-  sme_b_version: Joi.string().optional().allow(''),
   sme_a_claim: Joi.string().optional().allow(''),
   sme_b_claim: Joi.string().optional().allow('')
 });
