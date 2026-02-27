@@ -53,7 +53,7 @@ async function startSession(catalystApp, params, body, user) {
     stage_completion_estimate: 0
   };
 
-  // Create session
+  // Create session (closed_at omitted on create — Date column rejects empty string)
   await insert(catalystApp, 'Sessions', {
     session_id,
     sme_id,
@@ -64,8 +64,7 @@ async function startSession(catalystApp, params, body, user) {
     summary: '',
     conversation_state_json: safeStringify(initialState),
     status: 'active',
-    created_at: now,
-    closed_at: ''
+    created_at: now
   });
 
   // Build opening message
@@ -396,8 +395,7 @@ async function startSmeSession(catalystApp, params, body) {
     summary: '',
     conversation_state_json: safeStringify(initialState),
     status: 'active',
-    created_at: now,
-    closed_at: ''
+    created_at: now
   });
 
   const config = await getConfig(catalystApp);
