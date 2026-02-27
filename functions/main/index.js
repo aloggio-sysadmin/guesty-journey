@@ -36,7 +36,7 @@ function isAdminRoute(method, path) {
 }
 
 // Public routes (no auth required)
-const PUBLIC_ROUTES = new Set(['POST /auth/login', 'GET /health', 'POST /admin/seed']);
+const PUBLIC_ROUTES = new Set(['POST /auth/login', 'GET /health', 'POST /admin/seed', 'GET /admin/schema']);
 
 // SME self-service routes are public (authenticated via token in body/query)
 function isSmePublicRoute(method, path) {
@@ -169,8 +169,9 @@ function buildRouteTable() {
     { method: 'POST', pattern: '/project/recalculate',      handler: projectRoutes.recalculate },
     // Reports
     { method: 'POST', pattern: '/reports/:type',            handler: reportsRoutes.generate },
-    // Admin seed
+    // Admin
     { method: 'POST', pattern: '/admin/seed',               handler: projectRoutes.seed },
+    { method: 'GET',  pattern: '/admin/schema',             handler: projectRoutes.schema },
   ];
 }
 

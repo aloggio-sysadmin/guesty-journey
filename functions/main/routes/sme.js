@@ -38,7 +38,8 @@ async function create(catalystApp, params, body, user) {
     systems_used_json: safeStringify(value.systems_used_json || []),
     interview_status: 'pending',
     validated_by_sme: 'false',
-    notes: '',
+    validation_date: '',
+    created_by: user ? user.user_id : '',
     created_at: now,
     updated_at: now
   });
@@ -107,7 +108,7 @@ async function validate_sme(catalystApp, params, body, user) {
   const updates = {
     validated_by_sme: 'true',
     interview_status: 'validated',
-    notes: `Validated on ${new Date().toISOString()}`,
+    validation_date: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
   await update(catalystApp, 'SMERegister', row.ROWID, updates);

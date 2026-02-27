@@ -58,7 +58,7 @@ async function startSession(catalystApp, params, body, user) {
     session_id,
     sme_id,
     interviewer_user_id: user ? user.user_id : '',
-    session_date: now,
+    date_session: now,
     duration_minutes: 0,
     method: 'interview',
     summary: '',
@@ -138,7 +138,7 @@ async function listSessions(catalystApp) {
       sme_id: s.sme_id,
       sme_name,
       status: s.status,
-      session_date: s.session_date,
+      session_date: s.date_session,
       current_stage: state.current_stage || '',
       duration_minutes: s.duration_minutes
     });
@@ -389,7 +389,7 @@ async function startSmeSession(catalystApp, params, body) {
     session_id,
     sme_id,
     interviewer_user_id: '',
-    session_date: now,
+    date_session: now,
     duration_minutes: 0,
     method: 'sme_self_service',
     summary: '',
