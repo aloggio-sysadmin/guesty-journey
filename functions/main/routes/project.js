@@ -68,7 +68,7 @@ async function recalculate(catalystApp) {
   try {
     const allConflicts = await query(catalystApp, 'SELECT * FROM ConflictLog');
     conflictsOpen = allConflicts.filter(c =>
-      c.status === 'open' || c.resolution_status === 'unresolved'
+      c.resolution_status === 'unresolved'
     );
   } catch (e) {
     console.error('[project] ConflictLog query failed (table may not exist yet):', e.message);
@@ -164,4 +164,24 @@ async function seed(catalystApp) {
   return results;
 }
 
-module.exports = { getState, recalculate, seed };
+// GET /admin/schema — diagnostic: list actual columns for every table
+async function schema(catalystApp) {
+  const TABLE_NAMES = [
+    'Sessions', 'ChatHistory', 'SMERegister', 'Users',
+    'TechEcosystem', 'ProcessInventory', 'GapRegister',
+    'ConflictLog', 'JourneyMap', 'ProjectState', 'Counters'
+  ];
+  const result = {};
+  for (const name of TABLE_NAMES) {
+    try {
+      const table = catalystApp.datastore().table(name);
+      const cols = await table.getAllColumns();
+      result[name] = cols.map(c => c.column_name);
+    } catch (e) {
+      result[name] = `ERROR: ${e.message}`;
+    }
+  }
+  return result;
+}
+
+module.exports = { getState, recalculate, seed, schema };

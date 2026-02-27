@@ -27,21 +27,19 @@ async function processConflicts(catalystApp, conflictsDetected, smeId, userId) {
 
       await insert(catalystApp, 'ConflictLog', {
         conflict_id,
-        conflict_type: conflictType,
+        type: conflictType,
         description: `${conflict.field}: Current SME says "${conflict.new_value_from_current_sme}", existing data says "${conflict.existing_value}"`,
-        journey_stage: '',
-        process_id: conflict.existing_record_id || '',
         sme_a_id: smeId,
         sme_b_id: conflict.existing_sme_id || '',
-        sme_a_claim: conflict.new_value_from_current_sme || '',
-        sme_b_claim: conflict.existing_value || '',
-        status: 'open',
-        resolution_method: '',
+        sme_a_version: conflict.new_value_from_current_sme || '',
+        sme_b_version: conflict.existing_value || '',
+        related_process_ids_json: safeStringify(conflict.existing_record_id ? [conflict.existing_record_id] : []),
+        related_gap_ids_json: '[]',
+        resolution_status: 'unresolved',
         resolution_notes: '',
         resolved_by: '',
         created_by: userId,
-        created_at: now,
-        updated_at: now
+        created_at: now
       });
 
       savedConflicts.push(conflict_id);

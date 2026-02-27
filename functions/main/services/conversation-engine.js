@@ -60,7 +60,7 @@ async function processMessage(catalystApp, sessionId, userMessage, userId) {
     try {
       const allConflicts = await query(catalystApp, 'SELECT * FROM ConflictLog');
       openConflicts = allConflicts.filter(c =>
-        (c.status === 'open' || c.resolution_status === 'unresolved') &&
+        c.resolution_status === 'unresolved' &&
         (c.sme_a_id === sme.sme_id || c.sme_b_id === sme.sme_id)
       );
     } catch (e) {

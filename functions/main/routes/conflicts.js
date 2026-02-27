@@ -20,21 +20,19 @@ async function create(catalystApp, params, body, user) {
 
   const row = await insert(catalystApp, 'ConflictLog', {
     conflict_id,
-    conflict_type: value.conflict_type || 'data_inconsistency',
+    type: value.type || value.conflict_type || 'data_inconsistency',
     description: value.description,
-    journey_stage: value.journey_stage || '',
-    process_id: value.process_id || '',
     sme_a_id: value.sme_a_id,
     sme_b_id: value.sme_b_id || '',
-    sme_a_claim: value.sme_a_claim || '',
-    sme_b_claim: value.sme_b_claim || '',
-    status: 'open',
-    resolution_method: '',
+    sme_a_version: value.sme_a_version || value.sme_a_claim || '',
+    sme_b_version: value.sme_b_version || value.sme_b_claim || '',
+    related_process_ids_json: safeStringify(value.related_process_ids || []),
+    related_gap_ids_json: safeStringify(value.related_gap_ids || []),
+    resolution_status: 'unresolved',
     resolution_notes: '',
     resolved_by: '',
     created_by: user ? user.user_id : '',
-    created_at: now,
-    updated_at: now
+    created_at: now
   });
 
   return parseConflict(row);
@@ -52,16 +50,14 @@ async function list(catalystApp, params, body, user, queryParams) {
   }
 
   if (queryParams) {
-    if (queryParams.status) {
-      rows = rows.filter(r => (r.status || r.resolution_status) === queryParams.status);
-    }
-    if (queryParams.resolution_status) {
-      const want = queryParams.resolution_status === 'unresolved' ? ['open', 'unresolved'] : [queryParams.resolution_status];
-      rows = rows.filter(r => want.includes(r.status || r.resolution_status));
+    if (queryParams.status || queryParams.resolution_status) {
+      const val = queryParams.status || queryParams.resolution_status;
+      const want = val === 'open' ? ['open', 'unresolved'] : [val];
+      rows = rows.filter(r => want.includes(r.resolution_status));
     }
     if (queryParams.type || queryParams.conflict_type) {
       const t = queryParams.type || queryParams.conflict_type;
-      rows = rows.filter(r => r.conflict_type === t);
+      rows = rows.filter(r => r.type === t);
     }
   }
 
@@ -84,11 +80,10 @@ async function resolve(catalystApp, params, body, user) {
   if (!row) { const e = new Error('Conflict not found'); e.status = 404; throw e; }
 
   const updates = {
-    status: 'resolved',
+    resolution_status: 'resolved',
     resolution_notes: value.resolution_notes,
     resolved_by: user ? user.user_id : '',
-    resolution_method: 'manual',
-    updated_at: new Date().toISOString()
+    resolved_date: new Date().toISOString()
   };
 
   const updated = await update(catalystApp, 'ConflictLog', row.ROWID, updates);
