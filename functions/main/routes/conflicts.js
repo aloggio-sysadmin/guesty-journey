@@ -42,14 +42,29 @@ async function create(catalystApp, params, body, user) {
 
 // GET /conflicts
 async function list(catalystApp, params, body, user, queryParams) {
-  let sql = 'SELECT * FROM ConflictLog';
-  const conditions = [];
-  if (queryParams && queryParams.status) conditions.push(`status = '${queryParams.status}'`);
-  if (queryParams && queryParams.resolution_status) conditions.push(`status = '${queryParams.resolution_status === 'unresolved' ? 'open' : queryParams.resolution_status}'`);
-  if (queryParams && queryParams.type) conditions.push(`conflict_type = '${queryParams.type}'`);
-  if (queryParams && queryParams.conflict_type) conditions.push(`conflict_type = '${queryParams.conflict_type}'`);
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
-  const rows = await query(catalystApp, sql);
+  // Fetch all rows then filter in JS to avoid ZCQL column-name issues
+  let rows = [];
+  try {
+    rows = await query(catalystApp, 'SELECT * FROM ConflictLog');
+  } catch (e) {
+    console.error('[conflicts] ConflictLog query failed:', e.message);
+    return [];
+  }
+
+  if (queryParams) {
+    if (queryParams.status) {
+      rows = rows.filter(r => (r.status || r.resolution_status) === queryParams.status);
+    }
+    if (queryParams.resolution_status) {
+      const want = queryParams.resolution_status === 'unresolved' ? ['open', 'unresolved'] : [queryParams.resolution_status];
+      rows = rows.filter(r => want.includes(r.status || r.resolution_status));
+    }
+    if (queryParams.type || queryParams.conflict_type) {
+      const t = queryParams.type || queryParams.conflict_type;
+      rows = rows.filter(r => r.conflict_type === t);
+    }
+  }
+
   return rows.map(parseConflict);
 }
 

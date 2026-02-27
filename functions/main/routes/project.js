@@ -52,7 +52,7 @@ async function recalculate(catalystApp) {
 
   const [
     smeAll, smeInterviewed, smeValidated,
-    journeyMapped, processes, gaps, gapsResolved, conflictsOpen
+    journeyMapped, processes, gaps, gapsResolved
   ] = await Promise.all([
     query(catalystApp, 'SELECT * FROM SMERegister'),
     query(catalystApp, "SELECT * FROM SMERegister WHERE interview_status = 'completed' OR interview_status = 'validated'"),
@@ -60,9 +60,19 @@ async function recalculate(catalystApp) {
     query(catalystApp, 'SELECT * FROM JourneyMap'),
     query(catalystApp, 'SELECT * FROM ProcessInventory'),
     query(catalystApp, 'SELECT * FROM GapRegister'),
-    query(catalystApp, "SELECT * FROM GapRegister WHERE status = 'resolved'"),
-    query(catalystApp, "SELECT * FROM ConflictLog WHERE status = 'open'")
+    query(catalystApp, "SELECT * FROM GapRegister WHERE status = 'resolved'")
   ]);
+
+  // ConflictLog query is isolated — table/column may not match ZCQL expectations
+  let conflictsOpen = [];
+  try {
+    const allConflicts = await query(catalystApp, 'SELECT * FROM ConflictLog');
+    conflictsOpen = allConflicts.filter(c =>
+      c.status === 'open' || c.resolution_status === 'unresolved'
+    );
+  } catch (e) {
+    console.error('[project] ConflictLog query failed (table may not exist yet):', e.message);
+  }
 
   const completion = {
     smes_identified: smeAll.length,
