@@ -48,12 +48,25 @@ async function processMessage(catalystApp, sessionId, userMessage, userId) {
 
   // ── STEP 3: Load existing records for context ─────────────────────────
   const currentStage = conversationState.current_stage || 'discovery';
-  const [existingSystems, existingProcesses, existingGaps, openConflicts] = await Promise.all([
+  const [existingSystems, existingProcesses, existingGaps] = await Promise.all([
     query(catalystApp, 'SELECT * FROM TechEcosystem'),
     query(catalystApp, `SELECT * FROM ProcessInventory WHERE journey_stage = '${currentStage}'`),
-    query(catalystApp, 'SELECT * FROM GapRegister WHERE status = \'open\''),
-    sme ? query(catalystApp, `SELECT * FROM ConflictLog WHERE status = 'open' AND (sme_a_id = '${sme.sme_id}' OR sme_b_id = '${sme.sme_id}')`) : []
+    query(catalystApp, 'SELECT * FROM GapRegister WHERE status = \'open\'')
   ]);
+
+  // ConflictLog query is isolated — table/column may not match ZCQL expectations
+  let openConflicts = [];
+  if (sme) {
+    try {
+      const allConflicts = await query(catalystApp, 'SELECT * FROM ConflictLog');
+      openConflicts = allConflicts.filter(c =>
+        (c.status === 'open' || c.resolution_status === 'unresolved') &&
+        (c.sme_a_id === sme.sme_id || c.sme_b_id === sme.sme_id)
+      );
+    } catch (e) {
+      console.error('[conversation-engine] ConflictLog query failed (table may not exist yet):', e.message);
+    }
+  }
 
   // Load open questions from ProjectState
   let openQuestions = [];
