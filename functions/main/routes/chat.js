@@ -89,8 +89,23 @@ async function startSession(catalystApp, params, body, user) {
     content: `SESSION_START: Begin the interview. Greet the SME warmly and ask your first question about the ${initialStage} stage.`
   }];
 
-  const claudeResponse = await callClaudeForSummary(systemPrompt, openingMessages, config);
-  const reply = claudeResponse.reply || claudeResponse;
+  // Call Claude for opening message with fallback
+  const fallbackGreeting = `Hi ${sme.full_name}! Welcome to the Guest Journey Mapping interview. I'm here to learn about your experience and expertise.\n\nLet's start with the **${initialStage.replace(/_/g, ' ')}** stage of the guest journey. Can you walk me through what typically happens during this stage from your perspective?`;
+
+  let reply = fallbackGreeting;
+  let claudeResponse = {};
+  try {
+    console.log('[chat] Calling Claude for opening message, session:', session_id);
+    claudeResponse = await callClaudeForSummary(systemPrompt, openingMessages, config);
+    const claudeReply = claudeResponse.reply || (typeof claudeResponse === 'string' ? claudeResponse : '');
+    if (claudeReply && typeof claudeReply === 'string' && claudeReply.trim().length > 0) {
+      reply = claudeReply;
+    } else {
+      console.warn('[chat] Claude returned empty reply, using fallback. Response:', JSON.stringify(claudeResponse).slice(0, 300));
+    }
+  } catch (claudeErr) {
+    console.error('[chat] Claude API error for opening message:', claudeErr.message);
+  }
 
   // Save opening message to ChatHistory
   const msgId = await generateId(catalystApp, 'MSG');
@@ -98,7 +113,7 @@ async function startSession(catalystApp, params, body, user) {
     message_id: msgId,
     session_id,
     role: 'agent',
-    content: typeof reply === 'string' ? reply : JSON.stringify(reply),
+    content: reply,
     extractions_json: safeStringify(claudeResponse.extractions || {}),
     conflicts_json: '[]',
     open_questions_json: '[]',
@@ -117,7 +132,7 @@ async function startSession(catalystApp, params, body, user) {
   return {
     session_id,
     sme: hydrateSme,
-    opening_message: typeof reply === 'string' ? reply : (claudeResponse.reply || ''),
+    opening_message: reply,
     conversation_state: claudeResponse.conversation_state || initialState
   };
 }
@@ -361,8 +376,17 @@ async function startSmeSession(catalystApp, params, body) {
   const existingSessions = await getAllByField(catalystApp, 'Sessions', 'sme_id', sme_id);
   const activeSession = existingSessions.find(s => s.status === 'active' && s.method === 'sme_self_service');
   if (activeSession) {
-    // Resume existing session instead of creating new
-    return resumeSmeSession(catalystApp, { sessionId: activeSession.session_id }, { token: value.token });
+    // Check if session has any messages — if not, it was a broken/timed-out attempt
+    const existingMessages = await getAllByField(catalystApp, 'ChatHistory', 'session_id', activeSession.session_id);
+    if (existingMessages.length > 0) {
+      // Resume existing session with its messages
+      return resumeSmeSession(catalystApp, { sessionId: activeSession.session_id }, { token: value.token });
+    }
+    // Broken session (no messages) — mark it closed and start fresh
+    console.warn('[chat] Found active session with no messages, closing stale session:', activeSession.session_id);
+    try {
+      await update(catalystApp, 'Sessions', activeSession.ROWID, { status: 'closed', closed_at: new Date().toISOString() });
+    } catch (e) { /* non-fatal */ }
   }
 
   const sme = await getByField(catalystApp, 'SMERegister', 'sme_id', sme_id);
@@ -419,15 +443,31 @@ async function startSmeSession(catalystApp, params, body) {
     content: `SESSION_START: Begin the interview. Greet the SME warmly and ask your first question about the ${initialStage} stage.`
   }];
 
-  const claudeResponse = await callClaudeForSummary(systemPrompt, openingMessages, config);
-  const reply = claudeResponse.reply || claudeResponse;
+  // Call Claude for opening message with fallback
+  const fallbackGreeting = `Hi ${sme.full_name}! Welcome to the Guest Journey Mapping interview. I'm here to learn about your experience and expertise.\n\nLet's start with the **${initialStage.replace(/_/g, ' ')}** stage of the guest journey. Can you walk me through what typically happens during this stage from your perspective?`;
+
+  let reply = fallbackGreeting;
+  let claudeResponse = {};
+  try {
+    console.log('[chat] Calling Claude for opening message, session:', session_id);
+    claudeResponse = await callClaudeForSummary(systemPrompt, openingMessages, config);
+    const claudeReply = claudeResponse.reply || (typeof claudeResponse === 'string' ? claudeResponse : '');
+    if (claudeReply && typeof claudeReply === 'string' && claudeReply.trim().length > 0) {
+      reply = claudeReply;
+    } else {
+      console.warn('[chat] Claude returned empty reply, using fallback. Response:', JSON.stringify(claudeResponse).slice(0, 300));
+    }
+  } catch (claudeErr) {
+    console.error('[chat] Claude API error for opening message:', claudeErr.message);
+    // Use fallback greeting — session still works, user can chat
+  }
 
   const msgId = await generateId(catalystApp, 'MSG');
   await insert(catalystApp, 'ChatHistory', {
     message_id: msgId,
     session_id,
     role: 'agent',
-    content: typeof reply === 'string' ? reply : JSON.stringify(reply),
+    content: reply,
     extractions_json: safeStringify(claudeResponse.extractions || {}),
     conflicts_json: '[]',
     open_questions_json: '[]',
@@ -445,7 +485,7 @@ async function startSmeSession(catalystApp, params, body) {
   return {
     session_id,
     sme: { full_name: sme.full_name, role: sme.role, department: sme.department },
-    opening_message: typeof reply === 'string' ? reply : (claudeResponse.reply || ''),
+    opening_message: reply,
     conversation_state: claudeResponse.conversation_state || initialState
   };
 }
