@@ -138,14 +138,14 @@ async function sendLink(catalystApp, params, body, user) {
   );
 
   // Build the interview link
-  const domain = 'journey-7003032339.development.catalystserverless.com';
+  const domain = 'journey-7003032339.development.catalystserverless.com.au';
   const link = `https://${domain}/app/index.html#/interview/${token}`;
 
   // Send email via Catalyst
   try {
     const emailService = catalystApp.email();
     await emailService.sendMail({
-      from_email: 'support@journey-7003032339.development.catalystserverless.com',
+      from_email: 'support@journey-7003032339.development.catalystserverless.com.au',
       to_email: email,
       subject: 'Journey Mapping Interview — Your Session Link',
       content: `<html><body style="font-family:sans-serif;color:#1e293b;padding:20px">
