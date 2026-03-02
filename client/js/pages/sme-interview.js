@@ -21,17 +21,22 @@ export default async function renderSmeInterview(container, params) {
 
   const { session_id, sme, opening_message, conversation_state } = sessionData;
 
+  const stageName = (conversation_state?.current_stage || 'discovery').replace(/_/g, ' ');
+  const progressPct = Math.round((conversation_state?.stage_completion_estimate || 0) * 100);
+
   container.innerHTML = `
     <div class="chat-page" style="height:100vh">
-      <div class="chat-header" style="background:var(--primary);color:#fff">
-        <div style="flex:1">
-          <h3 style="margin:0;color:#fff">Journey Mapping Interview</h3>
-          <div style="font-size:13px;opacity:0.85">${esc(sme?.full_name || 'SME')} — ${esc(sme?.role || '')}</div>
+      <div class="chat-header" style="background:var(--primary);color:#fff;border-bottom:none">
+        <div style="flex:1;min-width:0">
+          <h3 style="margin:0;color:#fff;font-size:16px;font-weight:600">Journey Mapping Interview</h3>
+          <div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:2px">${esc(sme?.full_name || 'SME')} — ${esc(sme?.role || 'SME')}</div>
         </div>
-        <div class="chat-progress" style="color:#fff">
-          <span style="font-size:12px;opacity:0.85">${(conversation_state?.current_stage || 'discovery').replace(/_/g, ' ')}</span>
-          <div class="chat-progress-bar"><div class="chat-progress-bar-fill" id="progress-fill" style="width:${Math.round((conversation_state?.stage_completion_estimate || 0) * 100)}%"></div></div>
-          <span id="progress-pct">${Math.round((conversation_state?.stage_completion_estimate || 0) * 100)}%</span>
+        <div style="display:flex;align-items:center;gap:10px;min-width:180px">
+          <span style="font-size:12px;color:rgba(255,255,255,0.85);white-space:nowrap;text-transform:capitalize">${esc(stageName)}</span>
+          <div style="flex:1;height:4px;background:rgba(255,255,255,0.3);border-radius:2px;overflow:hidden;min-width:60px">
+            <div id="progress-fill" style="height:100%;background:#fff;border-radius:2px;transition:width 0.4s ease;width:${progressPct}%"></div>
+          </div>
+          <span id="progress-pct" style="font-size:12px;color:#fff;font-weight:600;min-width:32px;text-align:right">${progressPct}%</span>
         </div>
       </div>
       <div class="chat-body" style="flex-direction:column">
@@ -57,16 +62,14 @@ export default async function renderSmeInterview(container, params) {
   const sendBtn = document.getElementById('send-btn');
   let currentState = conversation_state;
 
-  // Render opening message
-  if (opening_message) {
-    appendMessage('agent', opening_message);
-  }
-
-  // Also render any existing messages if resuming
-  if (sessionData.messages) {
+  // Render messages: on resume, messages array contains full history (including opening);
+  // on new session, only opening_message is set.
+  if (sessionData.messages && sessionData.messages.length > 0) {
     for (const msg of sessionData.messages) {
       appendMessage(msg.role === 'agent' ? 'agent' : 'user', msg.content);
     }
+  } else if (opening_message) {
+    appendMessage('agent', opening_message);
   }
 
   // Auto-grow textarea
