@@ -6,7 +6,7 @@
  * Replace placeholder values before deployment.
  */
 const fallback = {
-  CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || '',
+  CLAUDE_API_KEY: process.env.Anthropic_API_Key || process.env.CLAUDE_API_KEY || '',
   CLAUDE_MODEL: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
   JWT_SECRET: process.env.JWT_SECRET || 'change-me-in-production-segments',
   JWT_EXPIRY: process.env.JWT_EXPIRY || '24h',
