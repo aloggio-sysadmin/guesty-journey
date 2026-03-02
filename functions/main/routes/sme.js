@@ -146,8 +146,9 @@ async function sendLink(catalystApp, params, body, user) {
     const emailService = catalystApp.email();
     await emailService.sendMail({
       from_email: 'zoho-sysadmin@alloggio.com.au',
-      to_email: email,
+      to_email: [email],
       subject: 'Journey Mapping Interview — Your Session Link',
+      html_mode: true,
       content: `<html><body style="font-family:sans-serif;color:#1e293b;padding:20px">
         <h2>Guest Journey Mapping Interview</h2>
         <p>Hi ${row.full_name},</p>
