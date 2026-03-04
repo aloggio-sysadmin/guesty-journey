@@ -107,6 +107,11 @@ export default async function renderSmeInterview(container, params) {
     appendMessage('agent', opening_message);
   }
 
+  // If resuming a closed/completed session, show finished state immediately
+  if (sessionData.session?.status === 'closed' || conversation_state?.interview_complete === true) {
+    showInterviewFinished();
+  }
+
   // Auto-grow textarea
   input.addEventListener('input', () => {
     input.style.height = 'auto';
@@ -153,6 +158,11 @@ export default async function renderSmeInterview(container, params) {
         currentState = res.conversation_state;
         updateProgress(currentState);
       }
+      // Check if interview was auto-completed by the backend
+      if (res.interview_complete) {
+        showInterviewFinished();
+        return;
+      }
     } catch (err) {
       hideTyping();
       appendMessage('agent', 'Sorry, something went wrong. Please try sending your message again.');
@@ -188,6 +198,33 @@ export default async function renderSmeInterview(container, params) {
     const fill = document.getElementById('progress-fill');
     if (pctEl) pctEl.textContent = pct + '%';
     if (fill) fill.style.width = pct + '%';
+  }
+
+  function showInterviewFinished() {
+    // Update progress to 100%
+    const pctEl = document.getElementById('progress-pct');
+    const fill = document.getElementById('progress-fill');
+    const label = document.querySelector('.sme-progress-label');
+    if (pctEl) pctEl.textContent = '100%';
+    if (fill) fill.style.width = '100%';
+    if (label) label.textContent = 'Complete';
+
+    // Dismiss help banner if still visible
+    const banner = document.getElementById('help-banner');
+    if (banner) banner.remove();
+
+    // Replace input area with completion message
+    const inputArea = document.getElementById('input-area');
+    if (inputArea) {
+      inputArea.innerHTML = `
+        <div class="sme-interview-done-bar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div>
+            <strong>Interview Complete</strong>
+            <p>Thank you for your time! Your responses have been recorded. You can now close this tab.</p>
+          </div>
+        </div>`;
+    }
   }
 }
 
