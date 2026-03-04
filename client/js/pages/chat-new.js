@@ -24,7 +24,7 @@ export default async function renderChatNew(container) {
             <div class="form-group"><label>Full Name *</label><input class="form-control" id="sme-name" required></div>
             <div class="form-group"><label>Role *</label><input class="form-control" id="sme-role" required placeholder="e.g. Front Desk Manager"></div>
             <div class="form-group"><label>Department</label><input class="form-control" id="sme-dept" placeholder="e.g. Operations"></div>
-            <div class="form-group"><label>Email</label><input class="form-control" type="email" id="sme-email" placeholder="sme@company.com"></div>
+            <div class="form-group"><label>Email *</label><input class="form-control" type="email" id="sme-email" placeholder="sme@company.com" required></div>
             <div class="form-group"><label>Location</label><input class="form-control" id="sme-loc"></div>
             <div class="form-group"><label>Journey Stages</label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
@@ -86,14 +86,51 @@ export default async function renderChatNew(container) {
         role: container.querySelector('#sme-role').value,
         department: container.querySelector('#sme-dept').value || '',
         location: container.querySelector('#sme-loc').value || '',
-        contact_json: email ? { email } : {},
+        contact_json: { email },
         journey_stages_owned_json: stages,
       });
       toast(`SME "${newSme.full_name}" registered successfully`, 'success');
-      window.location.hash = `#/sme/${newSme.sme_id}`;
+      // Show send-link prompt
+      showSendLinkPrompt(container, newSme);
     } catch (err) {
       toast(err.message, 'error');
       btn.disabled = false; btn.textContent = 'Register SME';
     }
+  });
+}
+
+function showSendLinkPrompt(container, sme) {
+  const email = sme.contact_json?.email || '';
+  // Replace the registration form card with the prompt
+  const formCard = container.querySelector('#new-sme-form').closest('.card');
+  formCard.innerHTML = `
+    <div style="text-align:center;padding:24px 16px">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <svg width="24" height="24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h3 style="margin:0 0 4px;font-size:18px;color:var(--text-primary)">${sme.full_name}</h3>
+      <p style="color:var(--text-secondary);font-size:13px;margin:0 0 20px">Registered successfully</p>
+      <p style="color:var(--text-primary);font-size:14px;margin:0 0 20px">Would you like to send the interview link to <strong>${email}</strong> now?</p>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn btn-primary" id="send-link-now-btn">Send Interview Link</button>
+        <button class="btn btn-ghost" id="skip-link-btn">Skip for Now</button>
+      </div>
+    </div>`;
+
+  formCard.querySelector('#send-link-now-btn').addEventListener('click', async () => {
+    const btn = formCard.querySelector('#send-link-now-btn');
+    btn.disabled = true; btn.textContent = 'Sending...';
+    try {
+      await smeApi.sendLink(sme.sme_id);
+      toast('Interview link sent!', 'success');
+      window.location.hash = `#/sme/${sme.sme_id}`;
+    } catch (err) {
+      toast(err.message, 'error');
+      btn.disabled = false; btn.textContent = 'Send Interview Link';
+    }
+  });
+
+  formCard.querySelector('#skip-link-btn').addEventListener('click', () => {
+    window.location.hash = `#/sme/${sme.sme_id}`;
   });
 }
