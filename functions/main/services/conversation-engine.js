@@ -171,18 +171,46 @@ async function processMessage(catalystApp, sessionId, userMessage, userId) {
     chat_history_timestamp: agentTimestamp
   });
 
-  // ── STEP 10: Update session conversation state ────────────────────────
-  await update(catalystApp, 'Sessions', session.ROWID, {
-    conversation_state_json: safeStringify(claudeResponse.conversation_state)
-  });
+  // ── STEP 10: Check if interview is complete ────────────────────────────
+  const interviewComplete = claudeResponse.conversation_state?.interview_complete === true;
 
-  // ── STEP 11: Recalculate project state ────────────────────────────────
+  // ── STEP 11: Update session conversation state ────────────────────────
+  const sessionUpdate = {
+    conversation_state_json: safeStringify(claudeResponse.conversation_state)
+  };
+
+  // Auto-close session if the interview is complete
+  if (interviewComplete) {
+    sessionUpdate.status = 'closed';
+    sessionUpdate.closed_at = new Date().toISOString();
+    const startTime = new Date(session.created_at).getTime();
+    sessionUpdate.duration_minutes = Math.round((Date.now() - startTime) / 60000);
+    sessionUpdate.summary = claudeResponse.reply || 'Interview completed.';
+
+    // Update SME status to completed
+    if (session.sme_id) {
+      try {
+        const smeRecord = await getByField(catalystApp, 'SMERegister', 'sme_id', session.sme_id);
+        if (smeRecord && smeRecord.interview_status !== 'validated') {
+          await update(catalystApp, 'SMERegister', smeRecord.ROWID, {
+            interview_status: 'completed',
+            updated_at: new Date().toISOString()
+          });
+        }
+      } catch (e) { /* non-fatal */ }
+    }
+    console.log('[conversation-engine] Interview complete — auto-closing session:', sessionId);
+  }
+
+  await update(catalystApp, 'Sessions', session.ROWID, sessionUpdate);
+
+  // ── STEP 12: Recalculate project state ────────────────────────────────
   try {
     const projectRoutes = require('../routes/project');
     await projectRoutes.recalculate(catalystApp);
   } catch (e) { /* non-fatal */ }
 
-  // ── STEP 12: Return to frontend ───────────────────────────────────────
+  // ── STEP 13: Return to frontend ───────────────────────────────────────
   return {
     reply: claudeResponse.reply,
     extractions: claudeResponse.extractions,
@@ -190,7 +218,8 @@ async function processMessage(catalystApp, sessionId, userMessage, userId) {
     open_questions: claudeResponse.open_questions,
     conversation_state: claudeResponse.conversation_state,
     saved_records: savedRecords,
-    saved_conflicts: savedConflicts
+    saved_conflicts: savedConflicts,
+    interview_complete: interviewComplete
   };
 }
 

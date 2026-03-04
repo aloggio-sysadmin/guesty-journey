@@ -37,8 +37,8 @@ export default async function renderSmeInterview(container, params) {
               <div class="sme-header-subtitle">${esc(sme?.full_name || 'SME')} &mdash; ${esc(sme?.role || 'SME')}</div>
             </div>
           </div>
-          <div class="sme-header-progress">
-            <span class="sme-progress-label">${esc(stageName)}</span>
+          <div class="sme-header-progress" title="Your current progress through the interview stages">
+            <span class="sme-progress-label" title="Current journey stage being discussed">${esc(stageName)}</span>
             <div class="sme-progress-track">
               <div class="sme-progress-fill" id="progress-fill" style="width:${progressPct}%"></div>
             </div>
@@ -47,18 +47,29 @@ export default async function renderSmeInterview(container, params) {
         </div>
 
         <div class="sme-chat-body">
+          <div class="sme-help-banner" id="help-banner">
+            <div class="sme-help-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="sme-help-content">
+              <strong>Welcome to your Journey Mapping Interview</strong>
+              <p>Our AI interviewer will guide you through each stage of the guest journey. Share your experiences, observations, and insights — there are no wrong answers. You can type your response below and press <kbd>Enter</kbd> to send. When you're done, click <em>Finish Interview</em>.</p>
+            </div>
+            <button class="sme-help-dismiss" id="dismiss-help" title="Dismiss">&times;</button>
+          </div>
           <div class="sme-chat-messages" id="chat-messages"></div>
         </div>
 
         <div class="sme-chat-input-area" id="input-area">
           <div class="sme-chat-input-row">
-            <textarea class="sme-chat-textarea" id="chat-input" placeholder="Type your response..." rows="1"></textarea>
-            <button class="sme-chat-send-btn" id="send-btn">
+            <textarea class="sme-chat-textarea" id="chat-input" placeholder="Type your response and press Enter to send..." rows="1"></textarea>
+            <button class="sme-chat-send-btn" id="send-btn" title="Send message">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
           <div class="sme-chat-footer">
-            <button class="sme-finish-btn" id="done-btn">Finish Interview</button>
+            <span class="sme-input-hint">Press <kbd>Enter</kbd> to send &bull; <kbd>Shift+Enter</kbd> for new line</span>
+            <button class="sme-finish-btn" id="done-btn" title="End the interview and submit your responses">Finish Interview</button>
           </div>
         </div>
 
@@ -75,6 +86,17 @@ export default async function renderSmeInterview(container, params) {
   const sendBtn = document.getElementById('send-btn');
   let currentState = conversation_state;
 
+  // Dismiss help banner
+  document.getElementById('dismiss-help').addEventListener('click', () => {
+    const banner = document.getElementById('help-banner');
+    banner.style.transition = 'opacity 0.2s ease, max-height 0.3s ease, padding 0.3s ease';
+    banner.style.opacity = '0';
+    banner.style.maxHeight = '0';
+    banner.style.padding = '0 16px';
+    banner.style.overflow = 'hidden';
+    setTimeout(() => banner.remove(), 300);
+  });
+
   // Render messages: on resume, messages array contains full history (including opening);
   // on new session, only opening_message is set.
   if (sessionData.messages && sessionData.messages.length > 0) {
@@ -83,6 +105,11 @@ export default async function renderSmeInterview(container, params) {
     }
   } else if (opening_message) {
     appendMessage('agent', opening_message);
+  }
+
+  // If resuming a closed/completed session, show finished state immediately
+  if (sessionData.session?.status === 'closed' || conversation_state?.interview_complete === true) {
+    showInterviewFinished();
   }
 
   // Auto-grow textarea
@@ -131,6 +158,11 @@ export default async function renderSmeInterview(container, params) {
         currentState = res.conversation_state;
         updateProgress(currentState);
       }
+      // Check if interview was auto-completed by the backend
+      if (res.interview_complete) {
+        showInterviewFinished();
+        return;
+      }
     } catch (err) {
       hideTyping();
       appendMessage('agent', 'Sorry, something went wrong. Please try sending your message again.');
@@ -166,6 +198,33 @@ export default async function renderSmeInterview(container, params) {
     const fill = document.getElementById('progress-fill');
     if (pctEl) pctEl.textContent = pct + '%';
     if (fill) fill.style.width = pct + '%';
+  }
+
+  function showInterviewFinished() {
+    // Update progress to 100%
+    const pctEl = document.getElementById('progress-pct');
+    const fill = document.getElementById('progress-fill');
+    const label = document.querySelector('.sme-progress-label');
+    if (pctEl) pctEl.textContent = '100%';
+    if (fill) fill.style.width = '100%';
+    if (label) label.textContent = 'Complete';
+
+    // Dismiss help banner if still visible
+    const banner = document.getElementById('help-banner');
+    if (banner) banner.remove();
+
+    // Replace input area with completion message
+    const inputArea = document.getElementById('input-area');
+    if (inputArea) {
+      inputArea.innerHTML = `
+        <div class="sme-interview-done-bar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <div>
+            <strong>Interview Complete</strong>
+            <p>Thank you for your time! Your responses have been recorded. You can now close this tab.</p>
+          </div>
+        </div>`;
+    }
   }
 }
 
