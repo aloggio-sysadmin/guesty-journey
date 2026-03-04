@@ -1,6 +1,6 @@
 'use strict';
 
-const { query, insert, update, getByField, getAllByField } = require('../utils/data-store');
+const { query, insert, update, deleteRow, getByField, getAllByField } = require('../utils/data-store');
 const { generateId } = require('../utils/id-generator');
 const { safeParse, safeStringify } = require('../utils/json-helpers');
 const { validate, startSessionSchema, sendMessageSchema, quickActionSchema, smeSessionStartSchema, smeSessionMessageSchema } = require('../utils/validators');
@@ -547,7 +547,26 @@ async function closeSmeSession(catalystApp, params, body) {
   return closeSession(catalystApp, params, body, null);
 }
 
+// DELETE /chat/:sessionId — delete a session and its chat history
+async function deleteSession(catalystApp, params) {
+  const session = await getByField(catalystApp, 'Sessions', 'session_id', params.sessionId);
+  if (!session) { const e = new Error('Session not found'); e.status = 404; throw e; }
+
+  // Delete all chat history for this session
+  try {
+    const messages = await getAllByField(catalystApp, 'ChatHistory', 'session_id', params.sessionId);
+    for (const msg of messages) {
+      await deleteRow(catalystApp, 'ChatHistory', msg.ROWID);
+    }
+  } catch (e) {
+    console.error('[chat] Error deleting chat history:', e.message);
+  }
+
+  await deleteRow(catalystApp, 'Sessions', session.ROWID);
+  return { success: true, deleted: params.sessionId };
+}
+
 module.exports = {
   startSession, listSessions, resumeSession, sendMessage, quickAction, closeSession,
-  startSmeSession, resumeSmeSession, sendSmeMessage, closeSmeSession
+  startSmeSession, resumeSmeSession, sendSmeMessage, closeSmeSession, deleteSession
 };

@@ -47,6 +47,7 @@ export const chat = {
   sendMessage: (id, content) => apiCall('POST', `/chat/${id}/message`, { content }),
   quickAction: (id, action, extra = {}) => apiCall('POST', `/chat/${id}/action`, { action, ...extra }),
   close: (id) => apiCall('POST', `/chat/${id}/close`),
+  deleteSession: (id) => apiCall('DELETE', `/chat/${id}`),
 };
 
 export const sme = {
@@ -56,6 +57,7 @@ export const sme = {
   update: (id, data) => apiCall('PUT', `/sme/${id}`, data),
   validate: (id) => apiCall('POST', `/sme/${id}/validate`),
   sendLink: (id) => apiCall('POST', `/sme/${id}/send-link`),
+  remove: (id) => apiCall('DELETE', `/sme/${id}`),
 };
 
 export const tech = {
