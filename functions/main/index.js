@@ -32,6 +32,7 @@ function isAdminRoute(method, path) {
   if (ADMIN_EXACT.includes(`${method} ${path}`)) return true;
   if (method === 'PUT' && path.startsWith('/auth/users/')) return true;
   if (method === 'POST' && path.match(/^\/sme\/[^/]+\/send-link$/)) return true;
+  if (method === 'DELETE') return true;
   return false;
 }
 
@@ -128,6 +129,7 @@ function buildRouteTable() {
     { method: 'POST', pattern: '/chat/sme/:sessionId/message',     handler: chatRoutes.sendSmeMessage },
     { method: 'POST', pattern: '/chat/sme/:sessionId/close',       handler: chatRoutes.closeSmeSession },
     // Regular chat
+    { method: 'DELETE', pattern: '/chat/:sessionId',          handler: chatRoutes.deleteSession },
     { method: 'GET',  pattern: '/chat/:sessionId',          handler: chatRoutes.resumeSession },
     { method: 'POST', pattern: '/chat/:sessionId/message',  handler: chatRoutes.sendMessage },
     { method: 'POST', pattern: '/chat/:sessionId/action',   handler: chatRoutes.quickAction },
@@ -139,6 +141,7 @@ function buildRouteTable() {
     { method: 'PUT',  pattern: '/sme/:id',                  handler: smeRoutes.update },
     { method: 'POST', pattern: '/sme/:id/validate',         handler: smeRoutes.validate },
     { method: 'POST', pattern: '/sme/:id/send-link',        handler: smeRoutes.sendLink },
+    { method: 'DELETE', pattern: '/sme/:id',                 handler: smeRoutes.remove },
     // Tech
     { method: 'POST', pattern: '/tech',                     handler: techRoutes.create },
     { method: 'GET',  pattern: '/tech',                     handler: techRoutes.list },

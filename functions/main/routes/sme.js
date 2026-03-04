@@ -1,7 +1,7 @@
 'use strict';
 
 const jwt = require('jsonwebtoken');
-const { query, insert, update, getByField, getAllByField } = require('../utils/data-store');
+const { query, insert, update, deleteRow, getByField, getAllByField } = require('../utils/data-store');
 const { generateId } = require('../utils/id-generator');
 const { safeParse, safeStringify } = require('../utils/json-helpers');
 const { validate, smeCreateSchema, smeUpdateSchema } = require('../utils/validators');
@@ -174,4 +174,27 @@ async function sendLink(catalystApp, params, body, user) {
   return { success: true, message: `Interview link sent to ${email}` };
 }
 
-module.exports = { create, list, get, update: update_sme, validate: validate_sme, sendLink };
+// DELETE /sme/:id
+async function remove(catalystApp, params) {
+  const sme = await getByField(catalystApp, 'SMERegister', 'sme_id', params.id);
+  if (!sme) { const e = new Error('SME not found'); e.status = 404; throw e; }
+
+  // Cascade: delete all sessions and their chat history for this SME
+  try {
+    const sessions = await getAllByField(catalystApp, 'Sessions', 'sme_id', params.id);
+    for (const session of sessions) {
+      const messages = await getAllByField(catalystApp, 'ChatHistory', 'session_id', session.session_id);
+      for (const msg of messages) {
+        await deleteRow(catalystApp, 'ChatHistory', msg.ROWID);
+      }
+      await deleteRow(catalystApp, 'Sessions', session.ROWID);
+    }
+  } catch (e) {
+    console.error('[sme] Error deleting related sessions:', e.message);
+  }
+
+  await deleteRow(catalystApp, 'SMERegister', sme.ROWID);
+  return { success: true, deleted: params.id };
+}
+
+module.exports = { create, list, get, update: update_sme, validate: validate_sme, sendLink, remove };

@@ -8,7 +8,8 @@ export default async function renderSmeDetail(container, params) {
     container.innerHTML = `<div class="page-header"><h2><a href="#/sme" style="color:var(--text-secondary)">SMEs</a> / ${data.full_name}</h2>
       <div class="page-actions">${data.interview_status === 'completed' ? `<button class="btn btn-success" id="validate-btn">✓ Validate SME</button>` : ''}
       ${email ? `<button class="btn btn-primary" id="send-link-btn">Send Interview Link</button>` : ''}
-      <a href="#/chat/new?sme_id=${data.sme_id}" class="btn btn-ghost">+ Admin Session</a></div></div>
+      <a href="#/chat/new?sme_id=${data.sme_id}" class="btn btn-ghost">+ Admin Session</a>
+      <button class="btn btn-danger" id="delete-sme-btn">Delete SME</button></div></div>
     <div class="page-body">
       <div class="card" style="margin-bottom:16px">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
@@ -41,6 +42,16 @@ export default async function renderSmeDetail(container, params) {
         toast(res.message || 'Interview link sent!', 'success');
         setTimeout(() => window.location.reload(), 1000);
       } catch (e) { toast(e.message, 'error'); slBtn.disabled = false; slBtn.textContent = 'Send Interview Link'; }
+    });
+    container.querySelector('#delete-sme-btn').addEventListener('click', async () => {
+      if (!confirm(`Delete SME "${data.full_name}"? This will also delete all their sessions and chat history.`)) return;
+      const btn = container.querySelector('#delete-sme-btn');
+      btn.disabled = true; btn.textContent = 'Deleting...';
+      try {
+        await smeApi.remove(data.sme_id);
+        toast(`SME "${data.full_name}" deleted`, 'success');
+        window.location.hash = '#/sme';
+      } catch (e) { toast(e.message, 'error'); btn.disabled = false; btn.textContent = 'Delete SME'; }
     });
   } catch (e) { container.innerHTML = `<div class="page-body"><div class="card"><p style="color:var(--error)">${e.message}</p></div></div>`; }
 }
