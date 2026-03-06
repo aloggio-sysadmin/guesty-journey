@@ -486,7 +486,9 @@ async function startSmeSession(catalystApp, params, body) {
     session_id,
     sme: { full_name: sme.full_name, role: sme.role, department: sme.department },
     opening_message: reply,
-    conversation_state: claudeResponse.conversation_state || initialState
+    conversation_state: claudeResponse.conversation_state || initialState,
+    assigned_stages: stagesOwned,
+    sop_files: safeParse(sme.sop_files_json, {})
   };
 }
 
@@ -511,12 +513,17 @@ async function resumeSmeSession(catalystApp, params, body, user, queryParams) {
     timestamp: row.chat_history_timestamp
   }));
 
+  const stagesOwned = sme ? safeParse(sme.journey_stages_owned_json, []) : [];
+
   return {
     session_id: session.session_id,
+    session: { status: session.status },
     status: session.status,
     sme: sme ? { full_name: sme.full_name, role: sme.role, department: sme.department } : null,
     messages,
-    conversation_state: safeParse(session.conversation_state_json, {})
+    conversation_state: safeParse(session.conversation_state_json, {}),
+    assigned_stages: stagesOwned,
+    sop_files: sme ? safeParse(sme.sop_files_json, {}) : {}
   };
 }
 

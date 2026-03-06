@@ -1,5 +1,16 @@
 import { smePublic } from '../api.js';
 
+const STAGE_LABELS = {
+  discovery: 'Discovery',
+  booking: 'Booking',
+  pre_arrival: 'Pre-arrival',
+  check_in: 'Check-in',
+  in_stay: 'In-stay',
+  check_out: 'Check-out',
+  post_stay: 'Post-stay',
+  re_engagement: 'Re-engagement'
+};
+
 export default async function renderSmeInterview(container, params) {
   const token = params.token;
   container.innerHTML = '<div class="sme-interview-wrapper"><div class="sme-chat-container" style="align-items:center;justify-content:center"><div class="spinner"></div></div></div>';
@@ -20,9 +31,33 @@ export default async function renderSmeInterview(container, params) {
   }
 
   const { session_id, sme, opening_message, conversation_state } = sessionData;
+  const stages = sessionData.assigned_stages || [];
+  let sopFiles = sessionData.sop_files || {};
 
   const stageName = (conversation_state?.current_stage || 'discovery').replace(/_/g, ' ');
   const progressPct = Math.round((conversation_state?.stage_completion_estimate || 0) * 100);
+
+  function buildStagePills() {
+    if (stages.length === 0) return '';
+    return `
+      <div class="sme-stage-selector" id="stage-selector">
+        ${stages.map(stageId => {
+          const label = STAGE_LABELS[stageId] || stageId.replace(/_/g, ' ');
+          const isActive = stageId === (conversation_state?.current_stage || stages[0]);
+          const hasFile = sopFiles[stageId] ? true : false;
+          return `
+            <div class="sme-stage-pill-group">
+              <button class="sme-stage-pill ${isActive ? 'active' : ''}" data-stage="${stageId}">
+                ${esc(label)}${hasFile ? '<span class="sme-sop-check" title="SOP uploaded">&#10003;</span>' : ''}
+              </button>
+              <button class="sme-sop-upload-btn" data-stage="${stageId}" title="Upload SOP for ${esc(label)}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </button>
+            </div>`;
+        }).join('')}
+        <input type="file" id="sop-file-input" accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg" style="display:none">
+      </div>`;
+  }
 
   container.innerHTML = `
     <div class="sme-interview-wrapper">
@@ -46,6 +81,8 @@ export default async function renderSmeInterview(container, params) {
           </div>
         </div>
 
+        ${buildStagePills()}
+
         <div class="sme-chat-body">
           <div class="sme-help-banner" id="help-banner">
             <div class="sme-help-icon">
@@ -53,7 +90,7 @@ export default async function renderSmeInterview(container, params) {
             </div>
             <div class="sme-help-content">
               <strong>Welcome to your Journey Mapping Interview</strong>
-              <p>Our AI interviewer will guide you through each stage of the guest journey. Share your experiences, observations, and insights — there are no wrong answers. You can type your response below and press <kbd>Enter</kbd> to send. When you're done, click <em>Finish Interview</em>.</p>
+              <p>Our AI interviewer will guide you through each stage of the guest journey. Share your experiences, observations, and insights — there are no wrong answers. You can type your response below and press <kbd>Enter</kbd> to send. Use the stage tabs above to jump between topics, and the upload icon to attach SOP documents. When you're done, click <em>Finish Interview</em>.</p>
             </div>
             <button class="sme-help-dismiss" id="dismiss-help" title="Dismiss">&times;</button>
           </div>
@@ -112,6 +149,111 @@ export default async function renderSmeInterview(container, params) {
     showInterviewFinished();
   }
 
+  // ── Stage pills: jump + file upload ────────────────────────────────
+  const stageSelector = document.getElementById('stage-selector');
+  const fileInput = document.getElementById('sop-file-input');
+  let uploadTargetStage = null;
+
+  if (stageSelector) {
+    stageSelector.addEventListener('click', async (e) => {
+      // Handle upload button click
+      const uploadBtn = e.target.closest('.sme-sop-upload-btn');
+      if (uploadBtn) {
+        e.stopPropagation();
+        uploadTargetStage = uploadBtn.dataset.stage;
+        fileInput.click();
+        return;
+      }
+
+      // Handle stage pill click (jump)
+      const pill = e.target.closest('.sme-stage-pill');
+      if (!pill || pill.classList.contains('active') || sendBtn.disabled) return;
+
+      const targetStage = pill.dataset.stage;
+      const label = STAGE_LABELS[targetStage] || targetStage.replace(/_/g, ' ');
+
+      showTyping();
+      sendBtn.disabled = true;
+      try {
+        const jumpMessage = `[STAGE_JUMP:${targetStage}] I'd like to talk about the ${label} stage now.`;
+        const res = await smePublic.sendMessage(session_id, jumpMessage, token);
+        hideTyping();
+        if (res.reply) {
+          appendMessage('agent', res.reply);
+        }
+        if (res.conversation_state) {
+          currentState = res.conversation_state;
+          updateProgress(currentState);
+        }
+        if (res.interview_complete) {
+          showInterviewFinished();
+        }
+      } catch (err) {
+        hideTyping();
+        appendMessage('agent', 'Sorry, something went wrong switching stages. Please try again.');
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    });
+  }
+
+  // File upload handler
+  if (fileInput) {
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file || !uploadTargetStage) return;
+      fileInput.value = '';
+
+      if (file.size > 10 * 1024 * 1024) {
+        appendMessage('agent', 'File is too large. Maximum size is 10MB.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+        const stage = uploadTargetStage;
+        const stageLabel = STAGE_LABELS[stage] || stage.replace(/_/g, ' ');
+
+        const uploadBtn = stageSelector.querySelector(`.sme-sop-upload-btn[data-stage="${stage}"]`);
+        if (uploadBtn) { uploadBtn.classList.add('uploading'); uploadBtn.disabled = true; }
+
+        try {
+          await smePublic.uploadSop(stage, file.name, file.type || 'application/octet-stream', base64, token);
+          sopFiles[stage] = { filename: file.name, uploaded_at: new Date().toISOString() };
+          updateSopIndicators();
+          appendMessage('agent', `SOP file "${file.name}" uploaded for ${stageLabel}. Thank you!`);
+        } catch (err) {
+          appendMessage('agent', `Failed to upload file: ${err.message}`);
+        } finally {
+          if (uploadBtn) { uploadBtn.classList.remove('uploading'); uploadBtn.disabled = false; }
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function updateSopIndicators() {
+    document.querySelectorAll('.sme-stage-pill').forEach(pill => {
+      const stage = pill.dataset.stage;
+      let check = pill.querySelector('.sme-sop-check');
+      if (sopFiles[stage]) {
+        if (!check) {
+          check = document.createElement('span');
+          check.className = 'sme-sop-check';
+          check.title = `SOP: ${sopFiles[stage].filename}`;
+          check.innerHTML = '&#10003;';
+          pill.appendChild(check);
+        }
+      } else if (check) {
+        check.remove();
+      }
+    });
+  }
+
+  // ── Chat input ─────────────────────────────────────────────────────
+
   // Auto-grow textarea
   input.addEventListener('input', () => {
     input.style.height = 'auto';
@@ -158,7 +300,6 @@ export default async function renderSmeInterview(container, params) {
         currentState = res.conversation_state;
         updateProgress(currentState);
       }
-      // Check if interview was auto-completed by the backend
       if (res.interview_complete) {
         showInterviewFinished();
         return;
@@ -198,10 +339,22 @@ export default async function renderSmeInterview(container, params) {
     const fill = document.getElementById('progress-fill');
     if (pctEl) pctEl.textContent = pct + '%';
     if (fill) fill.style.width = pct + '%';
+
+    // Update stage label in header
+    const label = document.querySelector('.sme-progress-label');
+    if (label && state?.current_stage) {
+      label.textContent = STAGE_LABELS[state.current_stage] || state.current_stage.replace(/_/g, ' ');
+    }
+
+    // Update active pill
+    if (state?.current_stage) {
+      document.querySelectorAll('.sme-stage-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.stage === state.current_stage);
+      });
+    }
   }
 
   function showInterviewFinished() {
-    // Update progress to 100%
     const pctEl = document.getElementById('progress-pct');
     const fill = document.getElementById('progress-fill');
     const label = document.querySelector('.sme-progress-label');
@@ -209,11 +362,14 @@ export default async function renderSmeInterview(container, params) {
     if (fill) fill.style.width = '100%';
     if (label) label.textContent = 'Complete';
 
-    // Dismiss help banner if still visible
     const banner = document.getElementById('help-banner');
     if (banner) banner.remove();
 
-    // Replace input area with completion message
+    // Disable stage pills
+    document.querySelectorAll('.sme-stage-pill, .sme-sop-upload-btn').forEach(btn => {
+      btn.disabled = true;
+    });
+
     const inputArea = document.getElementById('input-area');
     if (inputArea) {
       inputArea.innerHTML = `

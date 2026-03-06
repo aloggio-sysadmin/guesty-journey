@@ -58,6 +58,8 @@ export const sme = {
   validate: (id) => apiCall('POST', `/sme/${id}/validate`),
   sendLink: (id) => apiCall('POST', `/sme/${id}/send-link`),
   remove: (id) => apiCall('DELETE', `/sme/${id}`),
+  listSopFiles: (smeId) => apiCall('GET', `/files/sop/${smeId}`),
+  downloadSop: (smeId, stage) => apiCall('GET', `/files/sop/${smeId}/${stage}/download`),
 };
 
 export const tech = {
@@ -109,4 +111,6 @@ export const smePublic = {
   getSession: (sessionId, token) => apiCallPublic('GET', `/chat/sme/${sessionId}?token=${token}`),
   sendMessage: (sessionId, content, token) => apiCallPublic('POST', `/chat/sme/${sessionId}/message`, { content, token }),
   close: (sessionId, token) => apiCallPublic('POST', `/chat/sme/${sessionId}/close`, { token }),
+  uploadSop: (stage, filename, contentType, base64Data, token) =>
+    apiCallPublic('POST', '/files/sop/upload', { token, stage, filename, content_type: contentType, base64_data: base64Data }),
 };

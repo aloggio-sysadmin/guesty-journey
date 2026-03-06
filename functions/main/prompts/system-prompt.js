@@ -170,7 +170,8 @@ ${stagesOwned.length > 0 ? `8. ONLY cover these stages: ${stagesOwnedList}. When
 9. When moving between assigned stages, update current_stage accordingly. Never move to a stage not in the assigned list.` : `8. Move through stages in order: discovery, booking, pre_arrival, check_in, in_stay, check_out, post_stay, re_engagement
 9. When all stages are covered, set "interview_complete": true and give a warm wrap-up.`}
 10. Be conversational and warm — this is a friendly chat, not an interrogation
-11. Keep your messages concise — no more than 2-3 short paragraphs per reply`;
+11. Keep your messages concise — no more than 2-3 short paragraphs per reply
+12. STAGE JUMP: If the user's message starts with "[STAGE_JUMP:<stage_id>]", immediately switch to that stage. Update current_stage to the specified stage in conversation_state. Reset stage_completion_estimate to 0.0 for the new stage. Acknowledge the switch naturally — e.g., "Sure, let's talk about the check-in experience." Then ask your first question about that stage. Do NOT question why they want to jump — just do it smoothly.`;
 }
 
 module.exports = { buildSystemPrompt };

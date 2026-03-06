@@ -4,7 +4,7 @@ const catalyst = require('zcatalyst-sdk-node');
 
 // Route handlers (lazy-loaded)
 let authRoutes, chatRoutes, smeRoutes, techRoutes, processRoutes,
-    journeyRoutes, gapsRoutes, conflictsRoutes, projectRoutes, reportsRoutes;
+    journeyRoutes, gapsRoutes, conflictsRoutes, projectRoutes, reportsRoutes, filesRoutes;
 
 function loadRoutes() {
   if (!authRoutes) authRoutes = require('./routes/auth');
@@ -17,6 +17,7 @@ function loadRoutes() {
   if (!conflictsRoutes) conflictsRoutes = require('./routes/conflicts');
   if (!projectRoutes) projectRoutes = require('./routes/project');
   if (!reportsRoutes) reportsRoutes = require('./routes/reports');
+  if (!filesRoutes) filesRoutes = require('./routes/files');
 }
 
 const { authMiddleware, requireAdmin } = require('./middleware/auth');
@@ -43,6 +44,7 @@ const PUBLIC_ROUTES = new Set(['POST /auth/login', 'GET /health', 'POST /admin/s
 function isSmePublicRoute(method, path) {
   if (method === 'POST' && path === '/chat/sme-start') return true;
   if (path.startsWith('/chat/sme/')) return true;
+  if (method === 'POST' && path === '/files/sop/upload') return true;
   return false;
 }
 
@@ -172,6 +174,10 @@ function buildRouteTable() {
     { method: 'POST', pattern: '/project/recalculate',      handler: projectRoutes.recalculate },
     // Reports
     { method: 'POST', pattern: '/reports/:type',            handler: reportsRoutes.generate },
+    // Files (SOP uploads)
+    { method: 'POST', pattern: '/files/sop/upload',                    handler: filesRoutes.uploadSop },
+    { method: 'GET',  pattern: '/files/sop/:smeId',                    handler: filesRoutes.listSopFiles },
+    { method: 'GET',  pattern: '/files/sop/:smeId/:stage/download',    handler: filesRoutes.downloadSop },
     // Admin
     { method: 'POST', pattern: '/admin/seed',               handler: projectRoutes.seed },
     { method: 'GET',  pattern: '/admin/schema',             handler: projectRoutes.schema },
