@@ -14,7 +14,8 @@ function parseSme(row) {
     contact_json: safeParse(row.contact_json, {}),
     domains_json: safeParse(row.domains_json, []),
     journey_stages_owned_json: safeParse(row.journey_stages_owned_json, []),
-    systems_used_json: safeParse(row.systems_used_json, [])
+    systems_used_json: safeParse(row.systems_used_json, []),
+    sop_files_json: safeParse(row.sop_files_json, {})
   };
 }
 
