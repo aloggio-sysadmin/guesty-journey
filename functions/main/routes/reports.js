@@ -716,15 +716,18 @@ async function journeySpreadsheetData(catalystApp) {
     query(catalystApp, 'SELECT * FROM SMERegister')
   ]);
 
-  const smes = smeRows.map(s => ({
-    sme_id: s.sme_id,
-    full_name: s.full_name,
-    email: s.email || '',
-    department: s.department || '',
-    role: s.role || '',
-    interview_status: s.interview_status || 'pending',
-    stages: safeParse(s.journey_stages_owned_json, [])
-  }));
+  const smes = smeRows.map(s => {
+    const contact = safeParse(s.contact_json, {});
+    return {
+      sme_id: s.sme_id,
+      full_name: s.full_name,
+      email: contact.email || '',
+      department: s.department || '',
+      role: s.role || '',
+      interview_status: s.interview_status || 'pending',
+      stages: safeParse(s.journey_stages_owned_json, [])
+    };
+  });
 
   return {
     report: 'journey-spreadsheet',
