@@ -1,5 +1,50 @@
 import { FONTS_LINK, BASE_CSS, esc, openReportWindow, formatList } from './shared-styles.js';
 
+const PHASE_MAP = {
+  discovery: ['discovery', 'pre_booking', 'pre-booking', 'search', 'research'],
+  booking: ['booking', 'reservation', 'enquiry', 'inquiry'],
+  stay: ['arrival', 'check_in', 'check-in', 'in_stay', 'in-stay', 'during', 'departure', 'check_out', 'check-out'],
+  post_stay: ['post_stay', 'post-stay', 'follow_up', 'review', 'feedback'],
+  performance: ['performance', 'reporting', 'analytics', 'management']
+};
+
+const PHASE_LABELS = {
+  discovery: { label: 'DISCOVERY PHASE', color: '#2E75B6' },
+  booking: { label: 'BOOKING PHASE', color: '#2E75B6' },
+  stay: { label: 'STAY EXPERIENCE', color: '#5A8A5E' },
+  post_stay: { label: 'POST-STAY PHASE', color: '#E67E22' },
+  performance: { label: 'PERFORMANCE & MANAGEMENT', color: '#9B59B6' }
+};
+
+function getPhase(stageId) {
+  const id = (stageId || '').toLowerCase().replace(/\s+/g, '_');
+  for (const [phase, keywords] of Object.entries(PHASE_MAP)) {
+    if (keywords.some(k => id.includes(k))) return phase;
+  }
+  return 'stay';
+}
+
+function deriveFinancialType(stage) {
+  const allText = [
+    ...(stage.gaps || []).map(g => (g.title || '') + (g.gap_type || '')),
+    ...(stage.processes || []).map(p => p.process_name || '')
+  ].join(' ').toLowerCase();
+
+  if (['trust', 'accounting', 'reconciliation', 'ledger', 'trust account'].some(k => allText.includes(k))) return { type: 'Trust Event', cls: 'fin-trust' };
+  if (['expense', 'cost', 'procurement', 'supplier', 'payroll'].some(k => allText.includes(k))) return { type: 'Business Expense', cls: 'fin-expense' };
+  if (['fee', 'commission', 'surcharge', 'charge'].some(k => allText.includes(k))) return { type: 'Fee/Commission', cls: 'fin-fee' };
+  if (['payment', 'invoice', 'billing', 'revenue', 'price'].some(k => allText.includes(k))) return { type: 'Financial Event', cls: 'fin-trust' };
+  return { type: 'None', cls: 'fin-none' };
+}
+
+function deriveTouchpointType(stage) {
+  const hasTech = (stage.technology_touchpoints || []).length > 0;
+  const hasManual = (stage.backstage_processes || []).length > 0 || (stage.frontstage_interactions || []).length > 0;
+  if (hasTech && hasManual) return { type: 'Hybrid', cls: 'tp-hybrid' };
+  if (hasTech) return { type: 'Automated', cls: 'tp-auto' };
+  return { type: 'Human', cls: 'tp-human' };
+}
+
 export function generateSwimlane(data) {
   const stages = data.stages || [];
   if (!stages.length) {
@@ -7,37 +52,74 @@ export function generateSwimlane(data) {
     return;
   }
 
-  const stageRows = stages.map((s, i) => {
-    const hasHighRisk = s.gaps.some(g => g.guest_impact === 'high');
-    const rowClass = hasHighRisk ? 'stage-row intersect' : 'stage-row';
-    const smeNames = s.smes.map(m => m.name).join(', ') || '--';
+  // Group stages by phase
+  const phaseGroups = {};
+  for (const s of stages) {
+    const phase = getPhase(s.stage_id || s.journey_stage);
+    if (!phaseGroups[phase]) phaseGroups[phase] = [];
+    phaseGroups[phase].push(s);
+  }
 
-    // Financial indicators from gaps with financial keywords
-    const financialItems = s.gaps.filter(g =>
-      ['trust', 'financial', 'payment', 'invoice', 'cost', 'expense', 'revenue', 'commission', 'accounting'].some(k =>
-        ((g.title || '') + (g.gap_type || '')).toLowerCase().includes(k)
-      )
-    );
+  const phaseOrder = ['discovery', 'booking', 'stay', 'post_stay', 'performance'];
+  let stageIndex = 0;
+  let stageRowsHtml = '';
 
-    return `
+  for (const phase of phaseOrder) {
+    const group = phaseGroups[phase];
+    if (!group || !group.length) continue;
+    const pl = PHASE_LABELS[phase] || PHASE_LABELS.stay;
+
+    // Phase divider
+    stageRowsHtml += `
+    <div class="phase-divider" style="background: linear-gradient(90deg, #0E2340, #1A3A60);">
+      <span class="phase-label" style="color:${pl.color}">${pl.label}</span>
+    </div>`;
+
+    for (const s of group) {
+      stageIndex++;
+      const hasHighRisk = s.gaps.some(g => g.guest_impact === 'high');
+      const rowClass = hasHighRisk ? 'stage-row intersect' : 'stage-row';
+      const smeNames = s.smes.map(m => m.name).join(', ') || '--';
+      const financial = deriveFinancialType(s);
+      const tpType = deriveTouchpointType(s);
+      const hasDocSop = (s.processes || []).some(p => p.has_documentation);
+
+      // Financial items from gaps
+      const financialItems = s.gaps.filter(g =>
+        ['trust', 'financial', 'payment', 'invoice', 'cost', 'expense', 'revenue', 'commission', 'accounting', 'fee'].some(k =>
+          ((g.title || '') + (g.gap_type || '')).toLowerCase().includes(k)
+        )
+      );
+
+      stageRowsHtml += `
     <div class="stage-group">
       <div class="${rowClass}">
         <div class="col-stage">
-          <div class="stage-id">${String(i + 1).padStart(2, '0')}</div>
+          <div class="stage-id">${String(stageIndex).padStart(2, '0')}</div>
           <div class="stage-name">${esc(s.journey_stage)}</div>
           <div class="stage-team">${esc(smeNames)}</div>
         </div>
-        <div class="col-guest">${formatList(s.guest_actions)}</div>
+        <div class="col-guest">
+          ${s.stage_description ? `<div class="event-detail">${esc(s.stage_description)}</div>` : ''}
+          ${s.guest_actions.length ? '<div class="event-label">Guest Actions</div>' : ''}
+          ${formatList(s.guest_actions)}
+        </div>
         <div class="col-owner">
           ${s.frontstage_interactions.length ? '<div class="event-label">Frontstage</div>' : ''}
           ${formatList(s.frontstage_interactions)}
           ${s.backstage_processes.length ? '<div class="event-label" style="margin-top:8px">Backstage</div>' : ''}
           ${formatList(s.backstage_processes)}
+          ${smeNames !== '--' ? `<div class="event-label" style="margin-top:8px">Responsible</div><div style="font-size:11px;color:var(--ink2)">${esc(smeNames)}</div>` : ''}
         </div>
         <div class="col-fin">
-          ${financialItems.length ? financialItems.map(f => `<div style="font-size:11px;padding:2px 0"><span class="badge badge-high">${esc(f.title)}</span></div>`).join('') : '<span style="color:var(--mid-grey);font-size:11px">--</span>'}
+          <span class="fin-badge ${financial.cls}">${financial.type}</span>
+          ${financialItems.length ? financialItems.map(f => `<div style="font-size:11px;padding:2px 0"><span class="badge badge-high">${esc(f.title)}</span></div>`).join('') : ''}
         </div>
-        <div class="col-touch">${formatList(s.technology_touchpoints)}</div>
+        <div class="col-touch">
+          <span class="tp-badge ${tpType.cls}">${tpType.type}</span>
+          ${hasDocSop ? '<span class="sop-badge sop-yes">SOP</span>' : '<span class="sop-badge sop-no">No SOP</span>'}
+          ${formatList(s.technology_touchpoints)}
+        </div>
         <div class="col-risk">
           ${s.failure_points.length || s.gaps.filter(g => g.guest_impact === 'high').length ? `
             ${s.failure_points.map(fp => `<div style="font-size:11px;padding:2px 0" class="badge badge-crit">${esc(typeof fp === 'string' ? fp : fp.description || fp.name || JSON.stringify(fp))}</div>`).join('')}
@@ -45,8 +127,38 @@ export function generateSwimlane(data) {
           ` : '<span style="color:var(--mid-grey);font-size:11px">--</span>'}
         </div>
       </div>
+      ${hasHighRisk ? `
+      <div class="intersection-banner">
+        <span class="ib-icon">⚡</span>
+        <span class="ib-text">Cross-functional intersection — ${s.gaps.filter(g => g.guest_impact === 'high').length} high-impact gap${s.gaps.filter(g => g.guest_impact === 'high').length !== 1 ? 's' : ''} affecting this stage</span>
+      </div>` : ''}
     </div>`;
-  }).join('');
+    }
+  }
+
+  // Support function section — derive from SME data
+  const allSmes = stages.flatMap(s => s.smes || []);
+  const uniqueSmes = {};
+  for (const sme of allSmes) {
+    if (!uniqueSmes[sme.name]) uniqueSmes[sme.name] = sme;
+  }
+  const supportSmes = Object.values(uniqueSmes);
+
+  const supportSection = supportSmes.length ? `
+  <div class="support-section">
+    <div class="support-header">
+      <span class="support-title">Support Function Map</span>
+      <span class="support-count">${supportSmes.length} support roles</span>
+    </div>
+    <div class="support-body">
+      ${supportSmes.map(sme => `
+      <div class="support-row">
+        <div class="support-name">${esc(sme.name)}</div>
+        <div class="support-dept">${esc(sme.department || '--')}</div>
+        <div class="support-role">${esc(sme.role || '--')}</div>
+      </div>`).join('')}
+    </div>
+  </div>` : '';
 
   const html = `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -66,6 +178,15 @@ ${BASE_CSS}
 .summary-card.process { border-color: var(--expense); }
 .summary-card.touch { border-color: var(--fee); }
 .swimlane-wrapper { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.12); }
+/* Phase dividers */
+.phase-divider {
+  padding: 10px 18px; display: flex; align-items: center;
+  border-bottom: 2px solid rgba(255,255,255,0.1);
+}
+.phase-label {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase;
+}
+/* Lane headers */
 .lane-headers {
   display: grid; grid-template-columns: 180px 1fr 220px 160px 160px 160px;
   background: var(--navy); border-bottom: 2px solid var(--mid);
@@ -100,6 +221,44 @@ ${BASE_CSS}
 }
 .col-risk { border-right: none; }
 .event-label { font-size: 11.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
+.event-detail { font-size: 11px; color: var(--mid-grey); line-height: 1.5; margin-bottom: 6px; font-style: italic; }
+/* Financial badges */
+.fin-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; margin-bottom: 6px; }
+.fin-trust { background: var(--trust-l); color: #8B5E3C; }
+.fin-expense { background: var(--expense-l); color: #2A5A2E; }
+.fin-fee { background: var(--fee-l); color: #5B2880; }
+.fin-none { background: var(--grey); color: var(--mid-grey); }
+/* Touchpoint type badges */
+.tp-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; margin-bottom: 4px; }
+.tp-auto { background: #D6E4F0; color: #2E75B6; }
+.tp-human { background: #FCE4D6; color: #C0562A; }
+.tp-hybrid { background: #EAD1DC; color: #5B2880; }
+/* SOP badges */
+.sop-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-bottom: 6px; margin-left: 4px; }
+.sop-yes { background: #DFFBEA; color: var(--med); }
+.sop-no { background: #FFF3E0; color: var(--high); }
+/* Intersection banner */
+.intersection-banner {
+  background: linear-gradient(90deg, #FFF2CC, #FFF9E6); padding: 8px 18px;
+  display: flex; align-items: center; gap: 8px; border-top: 1px solid #F0D060;
+}
+.ib-icon { font-size: 14px; }
+.ib-text { font-size: 11.5px; font-weight: 600; color: #7A5000; }
+/* Support section */
+.support-section { margin-top: 32px; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.12); }
+.support-header {
+  background: linear-gradient(135deg, #4A1060, #6B1B9A); padding: 16px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.support-title { font-size: 14px; font-weight: 700; color: #fff; }
+.support-count { font-size: 12px; color: rgba(255,255,255,0.5); font-family: 'DM Mono', monospace; }
+.support-body { padding: 4px 0; }
+.support-row {
+  display: grid; grid-template-columns: 200px 180px 1fr; padding: 10px 20px;
+  border-bottom: 1px solid var(--border); font-size: 12.5px; color: var(--ink2);
+}
+.support-row:last-child { border-bottom: none; }
+.support-name { font-weight: 600; color: var(--navy); }
 @media (max-width: 1024px) {
   .summary-bar { grid-template-columns: repeat(3, 1fr); }
   .lane-headers, .stage-row { grid-template-columns: 140px 1fr 180px 140px 140px 140px; }
@@ -136,14 +295,16 @@ ${BASE_CSS}
   <div class="swimlane-wrapper">
     <div class="lane-headers">
       <div class="lane-header">Stage</div>
-      <div class="lane-header" style="color:#A8D4F5">Guest Actions</div>
-      <div class="lane-header" style="color:#A8E6C4">Owner / Process</div>
+      <div class="lane-header" style="color:#A8D4F5">Guest Journey</div>
+      <div class="lane-header" style="color:#A8E6C4">Owner Impact</div>
       <div class="lane-header" style="color:var(--trust)">Financial</div>
       <div class="lane-header" style="color:#F0E68C">Touchpoints</div>
       <div class="lane-header" style="color:#FFB3B3">Risk</div>
     </div>
-    ${stageRows}
+    ${stageRowsHtml}
   </div>
+
+  ${supportSection}
 </div>
 
 </body></html>`;

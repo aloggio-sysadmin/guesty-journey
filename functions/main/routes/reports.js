@@ -445,7 +445,8 @@ async function swimlaneData(catalystApp) {
     processesByStage[s].push({
       process_name: p.process_name,
       maturity: p.maturity || 'ad_hoc',
-      discrepancy_flag: p.discrepancy_flag === true || p.discrepancy_flag === 'true'
+      discrepancy_flag: p.discrepancy_flag === true || p.discrepancy_flag === 'true',
+      has_documentation: !!(p.as_documented)
     });
   }
 
