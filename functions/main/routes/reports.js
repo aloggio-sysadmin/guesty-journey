@@ -318,6 +318,428 @@ Generate a comprehensive executive summary.`
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// VISUAL REPORTS — rich data aggregation for standalone HTML / XLSX reports
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /reports/tech-landscape
+ * Systems grouped by category with journey-stage mapping.
+ */
+async function techLandscapeData(catalystApp) {
+  const [sysRows, stageRows] = await Promise.all([
+    query(catalystApp, 'SELECT * FROM TechEcosystem ORDER BY category, system_name'),
+    query(catalystApp, 'SELECT stage_id, journey_stage, technology_touchpoints_json FROM JourneyMap')
+  ]);
+
+  // Build reverse map: system_name → [stage_ids]
+  const stageMapping = {};
+  for (const s of stageRows) {
+    const touchpoints = safeParse(s.technology_touchpoints_json, []);
+    for (const tp of touchpoints) {
+      const name = (typeof tp === 'string' ? tp : tp.system || tp.name || '').toLowerCase();
+      if (name) {
+        if (!stageMapping[name]) stageMapping[name] = [];
+        if (!stageMapping[name].includes(s.journey_stage)) stageMapping[name].push(s.journey_stage);
+      }
+    }
+  }
+
+  const systems = sysRows.map(s => ({
+    system_id: s.system_id,
+    system_name: s.system_name,
+    vendor: s.vendor || '',
+    category: s.category || 'Other',
+    environment: s.environment || '',
+    integration_links: safeParse(s.integration_links_json, []),
+    manual_workarounds: safeParse(s.manual_workarounds_json, []),
+    users: safeParse(s.users_json, []),
+    journey_stages: stageMapping[s.system_name.toLowerCase()] || []
+  }));
+
+  const categoryBreakdown = {};
+  for (const s of systems) {
+    categoryBreakdown[s.category] = (categoryBreakdown[s.category] || 0) + 1;
+  }
+
+  return {
+    report: 'tech-landscape',
+    generated_at: new Date().toISOString(),
+    system_count: systems.length,
+    category_count: Object.keys(categoryBreakdown).length,
+    total_integrations: systems.reduce((n, s) => n + s.integration_links.length, 0),
+    workaround_count: systems.filter(s => s.manual_workarounds.length > 0).length,
+    category_breakdown: categoryBreakdown,
+    systems
+  };
+}
+
+/**
+ * POST /reports/journey-diagram
+ * Stages with phase groupings for Mermaid.js flowchart.
+ */
+async function journeyDiagramData(catalystApp) {
+  const rows = await query(catalystApp, 'SELECT * FROM JourneyMap ORDER BY ROWID');
+
+  const PHASE_MAP = {
+    discovery: ['discovery', 'pre_booking', 'pre-booking'],
+    booking: ['booking', 'reservation'],
+    pre_arrival: ['pre_arrival', 'pre-arrival'],
+    arrival: ['check_in', 'check-in', 'arrival'],
+    in_stay: ['in_stay', 'in-stay', 'during_stay'],
+    departure: ['check_out', 'check-out', 'departure'],
+    post_stay: ['post_stay', 'post-stay', 'follow_up']
+  };
+
+  function getPhase(stageId) {
+    const id = (stageId || '').toLowerCase().replace(/\s+/g, '_');
+    for (const [phase, keywords] of Object.entries(PHASE_MAP)) {
+      if (keywords.some(k => id.includes(k))) return phase;
+    }
+    return 'other';
+  }
+
+  const stages = rows.map(r => ({
+    stage_id: r.stage_id,
+    journey_stage: r.journey_stage,
+    stage_description: r.stage_description || '',
+    phase: getPhase(r.stage_id || r.journey_stage),
+    guest_actions_count: safeParse(r.guest_actions_json, []).length,
+    touchpoints_count: safeParse(r.technology_touchpoints_json, []).length,
+    failure_points_count: safeParse(r.failure_points_json, []).length
+  }));
+
+  const phases = {};
+  for (const s of stages) {
+    if (!phases[s.phase]) phases[s.phase] = [];
+    phases[s.phase].push(s.stage_id);
+  }
+
+  return {
+    report: 'journey-diagram',
+    generated_at: new Date().toISOString(),
+    stage_count: stages.length,
+    phase_count: Object.keys(phases).length,
+    stages,
+    phases
+  };
+}
+
+/**
+ * POST /reports/journey-swimlane
+ * Full stage data enriched with processes, gaps, and SMEs for swimlane.
+ */
+async function swimlaneData(catalystApp) {
+  const [stageRows, processRows, gapRows, smeRows] = await Promise.all([
+    query(catalystApp, 'SELECT * FROM JourneyMap ORDER BY ROWID'),
+    query(catalystApp, 'SELECT * FROM ProcessInventory ORDER BY journey_stage'),
+    query(catalystApp, 'SELECT * FROM GapRegister ORDER BY journey_stage_id'),
+    query(catalystApp, 'SELECT sme_id, full_name, department, role, journey_stages_owned_json FROM SMERegister')
+  ]);
+
+  // Index processes and gaps by stage
+  const processesByStage = {};
+  for (const p of processRows) {
+    const s = p.journey_stage || 'unknown';
+    if (!processesByStage[s]) processesByStage[s] = [];
+    processesByStage[s].push({
+      process_name: p.process_name,
+      maturity: p.maturity || 'ad_hoc',
+      discrepancy_flag: p.discrepancy_flag === true || p.discrepancy_flag === 'true'
+    });
+  }
+
+  const gapsByStage = {};
+  for (const g of gapRows) {
+    const s = g.journey_stage_id || 'unknown';
+    if (!gapsByStage[s]) gapsByStage[s] = [];
+    gapsByStage[s].push({
+      title: g.title,
+      gap_type: g.gap_type || 'other',
+      guest_impact: g.guest_impact || 'medium',
+      status: g.status || 'open'
+    });
+  }
+
+  // Index SMEs by stage
+  const smesByStage = {};
+  for (const sme of smeRows) {
+    const stages = safeParse(sme.journey_stages_owned_json, []);
+    for (const s of stages) {
+      if (!smesByStage[s]) smesByStage[s] = [];
+      smesByStage[s].push({ name: sme.full_name, department: sme.department || '', role: sme.role || '' });
+    }
+  }
+
+  const stages = stageRows.map(r => {
+    const stageId = r.stage_id || r.journey_stage;
+    return {
+      stage_id: r.stage_id,
+      journey_stage: r.journey_stage,
+      stage_description: r.stage_description || '',
+      guest_actions: safeParse(r.guest_actions_json, []),
+      frontstage_interactions: safeParse(r.frontstage_interactions_json, []),
+      backstage_processes: safeParse(r.backstage_processes_json, []),
+      technology_touchpoints: safeParse(r.technology_touchpoints_json, []),
+      failure_points: safeParse(r.failure_points_json, []),
+      processes: processesByStage[stageId] || processesByStage[r.journey_stage] || [],
+      gaps: gapsByStage[stageId] || gapsByStage[r.journey_stage] || [],
+      smes: smesByStage[stageId] || smesByStage[r.journey_stage] || []
+    };
+  });
+
+  const totalTouchpoints = stages.reduce((n, s) => n + s.technology_touchpoints.length, 0);
+  const totalRisks = stages.reduce((n, s) => n + s.failure_points.length + s.gaps.filter(g => g.guest_impact === 'high').length, 0);
+
+  return {
+    report: 'journey-swimlane',
+    generated_at: new Date().toISOString(),
+    stage_count: stages.length,
+    total_touchpoints: totalTouchpoints,
+    total_risks: totalRisks,
+    total_processes: processRows.length,
+    stages
+  };
+}
+
+/**
+ * POST /reports/artefacts-guide
+ * Identifies required supporting artefacts based on data gaps.
+ */
+async function artefactsGuideData(catalystApp) {
+  const [processRows, gapRows, systemRows, conflictRows] = await Promise.all([
+    query(catalystApp, 'SELECT * FROM ProcessInventory'),
+    query(catalystApp, 'SELECT * FROM GapRegister'),
+    query(catalystApp, 'SELECT * FROM TechEcosystem'),
+    query(catalystApp, 'SELECT * FROM ConflictLog')
+  ]);
+
+  const sections = [];
+
+  // Section 1: Trust & Compliance
+  const trustGaps = gapRows.filter(g =>
+    ['trust', 'compliance', 'financial', 'accounting', 'audit'].some(k =>
+      ((g.title || '') + (g.gap_type || '') + (g.description || '')).toLowerCase().includes(k)
+    )
+  );
+  const trustProcesses = processRows.filter(p =>
+    ['trust', 'compliance', 'financial', 'accounting', 'reconciliation'].some(k =>
+      ((p.process_name || '') + (p.journey_stage || '')).toLowerCase().includes(k)
+    )
+  );
+  sections.push({
+    id: 'trust-compliance',
+    title: 'Trust Accounting & Compliance',
+    artefacts: [
+      ...trustProcesses.map(p => ({
+        name: p.process_name,
+        type: 'Process Documentation',
+        description: p.as_documented || `Process in ${p.journey_stage} stage — maturity: ${p.maturity || 'ad_hoc'}`,
+        priority: p.discrepancy_flag === true || p.discrepancy_flag === 'true' ? 'critical' : (p.maturity === 'ad_hoc' ? 'high' : 'medium'),
+        stage: p.journey_stage || ''
+      })),
+      ...trustGaps.map(g => ({
+        name: g.title,
+        type: 'Gap Resolution',
+        description: g.description || g.root_cause || '',
+        priority: g.guest_impact === 'high' ? 'critical' : (g.guest_impact === 'medium' ? 'high' : 'medium'),
+        stage: g.journey_stage_id || ''
+      }))
+    ]
+  });
+
+  // Section 2: Systems & Integrations
+  const workaroundSystems = systemRows.filter(s => safeParse(s.manual_workarounds_json, []).length > 0);
+  const integrationSystems = systemRows.filter(s => safeParse(s.integration_links_json, []).length > 0);
+  sections.push({
+    id: 'systems-integrations',
+    title: 'Systems & Integrations',
+    artefacts: [
+      ...workaroundSystems.map(s => ({
+        name: `${s.system_name} — Manual Workarounds`,
+        type: 'System Documentation',
+        description: `${safeParse(s.manual_workarounds_json, []).length} manual workaround(s) identified. Vendor: ${s.vendor || 'Unknown'}`,
+        priority: 'high',
+        stage: ''
+      })),
+      ...integrationSystems.slice(0, 10).map(s => ({
+        name: `${s.system_name} Integration Map`,
+        type: 'Integration Documentation',
+        description: `${safeParse(s.integration_links_json, []).length} integration link(s). Category: ${s.category || 'Other'}`,
+        priority: 'medium',
+        stage: ''
+      }))
+    ]
+  });
+
+  // Section 3: Operations & SOPs
+  const undocumented = processRows.filter(p => !p.as_documented && (p.maturity === 'ad_hoc' || !p.maturity));
+  const discrepancies = processRows.filter(p => p.discrepancy_flag === true || p.discrepancy_flag === 'true');
+  sections.push({
+    id: 'operations-sops',
+    title: 'Operations & SOPs',
+    artefacts: [
+      ...undocumented.map(p => ({
+        name: `SOP: ${p.process_name}`,
+        type: 'Standard Operating Procedure',
+        description: `Undocumented process in ${p.journey_stage || 'unknown'} stage. Currently ad-hoc.`,
+        priority: 'high',
+        stage: p.journey_stage || ''
+      })),
+      ...discrepancies.map(p => ({
+        name: `Discrepancy: ${p.process_name}`,
+        type: 'Process Review',
+        description: p.discrepancy_notes || `Documented vs practiced discrepancy in ${p.journey_stage || 'unknown'} stage`,
+        priority: 'critical',
+        stage: p.journey_stage || ''
+      }))
+    ]
+  });
+
+  // Section 4: Financial & Commercial
+  const financialGaps = gapRows.filter(g =>
+    ['expense', 'cost', 'revenue', 'pricing', 'payment', 'invoice', 'commission'].some(k =>
+      ((g.title || '') + (g.description || '') + (g.gap_type || '')).toLowerCase().includes(k)
+    )
+  );
+  sections.push({
+    id: 'financial-commercial',
+    title: 'Financial & Commercial',
+    artefacts: financialGaps.map(g => ({
+      name: g.title,
+      type: 'Financial Analysis',
+      description: g.description || '',
+      priority: g.guest_impact === 'high' ? 'critical' : 'high',
+      stage: g.journey_stage_id || ''
+    }))
+  });
+
+  // Section 5: Guest & Owner Experience
+  const experienceGaps = gapRows.filter(g =>
+    ['guest', 'owner', 'experience', 'satisfaction', 'communication', 'feedback'].some(k =>
+      ((g.title || '') + (g.description || '') + (g.gap_type || '')).toLowerCase().includes(k)
+    )
+  );
+  sections.push({
+    id: 'guest-owner-experience',
+    title: 'Guest & Owner Experience',
+    artefacts: experienceGaps.map(g => ({
+      name: g.title,
+      type: 'Experience Improvement',
+      description: g.description || '',
+      priority: g.guest_impact === 'high' ? 'critical' : (g.guest_impact === 'medium' ? 'high' : 'medium'),
+      stage: g.journey_stage_id || ''
+    }))
+  });
+
+  // Section 6: Support Function
+  const openConflicts = conflictRows.filter(c => c.status !== 'resolved');
+  sections.push({
+    id: 'support-function',
+    title: 'Support Function',
+    artefacts: openConflicts.map(c => ({
+      name: c.description || 'Unresolved conflict',
+      type: 'Conflict Resolution',
+      description: `Type: ${c.conflict_type || 'unknown'} — Stage: ${c.journey_stage || 'unknown'}`,
+      priority: 'high',
+      stage: c.journey_stage || ''
+    }))
+  });
+
+  const totalArtefacts = sections.reduce((n, s) => n + s.artefacts.length, 0);
+  const allArtefacts = sections.flatMap(s => s.artefacts);
+  const priorityCounts = {
+    critical: allArtefacts.filter(a => a.priority === 'critical').length,
+    high: allArtefacts.filter(a => a.priority === 'high').length,
+    medium: allArtefacts.filter(a => a.priority === 'medium').length
+  };
+
+  return {
+    report: 'artefacts-guide',
+    generated_at: new Date().toISOString(),
+    total_artefacts: totalArtefacts,
+    priority_counts: priorityCounts,
+    section_count: sections.length,
+    sections
+  };
+}
+
+/**
+ * POST /reports/operational-report
+ * Comprehensive report aggregating ALL data — reuses existing report functions.
+ */
+async function operationalReportData(catalystApp) {
+  const [jm, pi, te, go, cr, es, smeRows] = await Promise.all([
+    journeyMap(catalystApp),
+    processInventory(catalystApp),
+    techEcosystem(catalystApp),
+    gapOpportunity(catalystApp),
+    conflictResolution(catalystApp),
+    executiveSummary(catalystApp),
+    query(catalystApp, 'SELECT sme_id, full_name, department, role, interview_status, journey_stages_owned_json FROM SMERegister')
+  ]);
+
+  const smes = smeRows.map(s => ({
+    sme_id: s.sme_id,
+    full_name: s.full_name,
+    department: s.department || '',
+    role: s.role || '',
+    interview_status: s.interview_status || 'pending',
+    stages: safeParse(s.journey_stages_owned_json, [])
+  }));
+
+  return {
+    report: 'operational-report',
+    generated_at: new Date().toISOString(),
+    executive: es,
+    journey: jm,
+    processes: pi,
+    technology: te,
+    gaps: go,
+    conflicts: cr,
+    smes,
+    stats: es.statistics
+  };
+}
+
+/**
+ * POST /reports/journey-spreadsheet
+ * All data structured for multi-sheet XLSX generation on the client.
+ */
+async function journeySpreadsheetData(catalystApp) {
+  const [jm, pi, te, go, cr, smeRows] = await Promise.all([
+    journeyMap(catalystApp),
+    processInventory(catalystApp),
+    techEcosystem(catalystApp),
+    gapOpportunity(catalystApp),
+    conflictResolution(catalystApp),
+    query(catalystApp, 'SELECT * FROM SMERegister')
+  ]);
+
+  const smes = smeRows.map(s => ({
+    sme_id: s.sme_id,
+    full_name: s.full_name,
+    email: s.email || '',
+    department: s.department || '',
+    role: s.role || '',
+    interview_status: s.interview_status || 'pending',
+    stages: safeParse(s.journey_stages_owned_json, [])
+  }));
+
+  return {
+    report: 'journey-spreadsheet',
+    generated_at: new Date().toISOString(),
+    journey: jm,
+    processes: pi,
+    technology: te,
+    gaps: go,
+    conflicts: cr,
+    smes
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+
 /**
  * Dispatcher — called by the router for POST /reports/:type
  */
@@ -330,6 +752,12 @@ async function generate(catalystApp, params) {
     case 'gap-opportunity':     return gapOpportunity(catalystApp);
     case 'conflict-resolution': return conflictResolution(catalystApp);
     case 'executive-summary':   return executiveSummary(catalystApp);
+    case 'tech-landscape':      return techLandscapeData(catalystApp);
+    case 'journey-diagram':     return journeyDiagramData(catalystApp);
+    case 'journey-swimlane':    return swimlaneData(catalystApp);
+    case 'artefacts-guide':     return artefactsGuideData(catalystApp);
+    case 'operational-report':  return operationalReportData(catalystApp);
+    case 'journey-spreadsheet': return journeySpreadsheetData(catalystApp);
     default: {
       const e = new Error(`Unknown report type: ${type}`);
       e.status = 400;
