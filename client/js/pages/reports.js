@@ -1,6 +1,12 @@
 import { apiCall } from '../api.js';
 import { toast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
+import { generateTechLandscape } from '../reports/tech-landscape.js';
+import { generateJourneyDiagram } from '../reports/journey-diagram.js';
+import { generateSwimlane } from '../reports/swimlane.js';
+import { generateArtefactsGuide } from '../reports/artefacts-guide.js';
+import { generateOperationalReport } from '../reports/operational-report.js';
+import { generateJourneySpreadsheet } from '../reports/journey-spreadsheet.js';
 
 const REPORTS = [
   {
@@ -47,27 +53,89 @@ const REPORTS = [
   }
 ];
 
+const VISUAL_REPORTS = [
+  {
+    id: 'tech-landscape',
+    title: 'Technology Landscape',
+    description: 'Interactive technology map with categories, integrations, journey stage mapping, and search.',
+    icon: '🏗️',
+    color: 'teal',
+    handler: generateTechLandscape
+  },
+  {
+    id: 'journey-diagram',
+    title: 'Journey Flow Diagram',
+    description: 'Visual flowchart of the guest journey with phases, stage connections, and Mermaid.js rendering.',
+    icon: '🔀',
+    color: 'sky',
+    handler: generateJourneyDiagram
+  },
+  {
+    id: 'journey-swimlane',
+    title: 'Journey Swimlane',
+    description: 'Six-column swimlane view: stages, guest actions, processes, financial, touchpoints, and risks.',
+    icon: '🏊',
+    color: 'ocean',
+    handler: generateSwimlane
+  },
+  {
+    id: 'artefacts-guide',
+    title: 'Supporting Artefacts',
+    description: 'Prioritised guide of documentation and artefacts needed based on interview findings.',
+    icon: '📋',
+    color: 'orange',
+    handler: generateArtefactsGuide
+  },
+  {
+    id: 'operational-report',
+    title: 'Operational Report',
+    description: 'Comprehensive 8-section report: executive summary, gaps, processes, technology, risks, and more.',
+    icon: '📑',
+    color: 'navy',
+    handler: generateOperationalReport
+  },
+  {
+    id: 'journey-spreadsheet',
+    title: 'Journey Map (Excel)',
+    description: 'Multi-sheet XLSX download with journey map, processes, technology, gaps, conflicts, and SMEs.',
+    icon: '📊',
+    color: 'emerald',
+    handler: generateJourneySpreadsheet
+  }
+];
+
+function renderReportCard(r) {
+  return `
+    <div class="card" style="display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="font-size:28px">${r.icon}</div>
+        <div>
+          <div class="card-title" style="margin:0">${r.title}</div>
+          <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">${r.description}</p>
+        </div>
+      </div>
+      <div style="margin-top:auto">
+        <button class="btn btn-primary btn-sm" data-generate="${r.id}" style="width:100%">Generate</button>
+      </div>
+    </div>`;
+}
+
 export default function renderReports(container) {
   container.innerHTML = `
     <div class="page-header">
       <h2>Reports</h2>
     </div>
     <div class="page-body">
+      <h3 style="font-size:14px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">Visual Reports</h3>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Rich, interactive reports that open in a new tab. Styled for presentation and print.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:32px">
+        ${VISUAL_REPORTS.map(renderReportCard).join('')}
+      </div>
+
+      <h3 style="font-size:14px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">Data Reports</h3>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Quick data summaries shown in a modal with print/export option.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
-        ${REPORTS.map(r => `
-          <div class="card" style="display:flex;flex-direction:column">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-              <div style="font-size:28px">${r.icon}</div>
-              <div>
-                <div class="card-title" style="margin:0">${r.title}</div>
-                <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">${r.description}</p>
-              </div>
-            </div>
-            <div style="margin-top:auto">
-              <button class="btn btn-primary btn-sm" data-generate="${r.id}" style="width:100%">Generate</button>
-            </div>
-          </div>
-        `).join('')}
+        ${REPORTS.map(renderReportCard).join('')}
       </div>
     </div>`;
 
@@ -75,12 +143,21 @@ export default function renderReports(container) {
     const btn = e.target.closest('[data-generate]');
     if (!btn) return;
     const reportId = btn.dataset.generate;
-    const report = REPORTS.find(r => r.id === reportId);
     btn.disabled = true;
     btn.textContent = 'Generating...';
+
     try {
-      const data = await apiCall('POST', `/reports/${reportId}`);
-      showReportModal(report, data);
+      // Check if this is a visual report
+      const visualReport = VISUAL_REPORTS.find(r => r.id === reportId);
+      if (visualReport) {
+        const data = await apiCall('POST', `/reports/${reportId}`);
+        await visualReport.handler(data);
+      } else {
+        // Standard modal report
+        const report = REPORTS.find(r => r.id === reportId);
+        const data = await apiCall('POST', `/reports/${reportId}`);
+        showReportModal(report, data);
+      }
     } catch (err) {
       toast(err.message || 'Failed to generate report', 'error');
     } finally {
