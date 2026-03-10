@@ -185,7 +185,10 @@ async function gapOpportunity(catalystApp) {
  * Returns all ConflictLog records with resolution status.
  */
 async function conflictResolution(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT * FROM ConflictLog ORDER BY status, journey_stage');
+  // ConflictLog columns: conflict_id, type, description, sme_a_id, sme_b_id,
+  // sme_a_version, sme_b_version, related_process_ids_json, related_gap_ids_json,
+  // resolution_status, resolution_notes, resolved_by, created_by, created_at
+  const rows = await query(catalystApp, 'SELECT * FROM ConflictLog');
 
   const smeCache = {};
   const getSme = async (smeId) => {
@@ -197,22 +200,28 @@ async function conflictResolution(catalystApp) {
     return smeCache[smeId];
   };
 
-  const conflicts = await Promise.all(rows.map(async c => ({
-    conflict_id: c.conflict_id,
-    description: c.description,
-    conflict_type: c.conflict_type || '',
-    journey_stage: c.journey_stage || '',
-    process_id: c.process_id || '',
-    sme_a_id: c.sme_a_id || '',
-    sme_b_id: c.sme_b_id || '',
-    sme_a_name: await getSme(c.sme_a_id),
-    sme_b_name: await getSme(c.sme_b_id),
-    status: c.status || 'open',
-    resolution_method: c.resolution_method || '',
-    resolution_notes: c.resolution_notes || '',
-    resolved_by: c.resolved_by || '',
-    created_at: c.created_at
-  })));
+  const conflicts = await Promise.all(rows.map(async c => {
+    const status = c.resolution_status === 'resolved' ? 'resolved' : 'open';
+    return {
+      conflict_id: c.conflict_id,
+      description: c.description || '',
+      conflict_type: c.type || '',
+      journey_stage: '',
+      process_id: '',
+      sme_a_id: c.sme_a_id || '',
+      sme_b_id: c.sme_b_id || '',
+      sme_a_name: await getSme(c.sme_a_id),
+      sme_b_name: await getSme(c.sme_b_id),
+      status,
+      resolution_method: '',
+      resolution_notes: c.resolution_notes || '',
+      resolved_by: c.resolved_by || '',
+      created_at: c.created_at
+    };
+  }));
+
+  // Sort: open first, then resolved
+  conflicts.sort((a, b) => (a.status === b.status ? 0 : a.status === 'open' ? -1 : 1));
 
   const statusCounts = conflicts.reduce((acc, c) => {
     acc[c.status] = (acc[c.status] || 0) + 1;
@@ -266,9 +275,9 @@ async function executiveSummary(catalystApp) {
     "SELECT title, journey_stage_id, gap_type FROM GapRegister WHERE guest_impact = 'high' AND status = 'open'"
   );
 
-  // Fetch open conflicts
+  // Fetch open conflicts (column is resolution_status, not status; type, not conflict_type)
   const openConflicts = await query(catalystApp,
-    "SELECT description, conflict_type FROM ConflictLog WHERE status = 'open'"
+    "SELECT description, type FROM ConflictLog WHERE resolution_status = 'unresolved'"
   );
 
   const systemPrompt = `You are a hospitality consulting expert preparing an executive summary for senior leadership.
@@ -293,7 +302,7 @@ High-impact open gaps (${highGaps.length}):
 ${highGaps.map(g => `- [${g.journey_stage_id}] ${g.title} (${g.gap_type})`).join('\n') || 'None'}
 
 Open conflicts (${openConflicts.length}):
-${openConflicts.map(c => `- ${c.description} (${c.conflict_type})`).join('\n') || 'None'}
+${openConflicts.map(c => `- ${c.description} (${c.type})`).join('\n') || 'None'}
 
 Generate a comprehensive executive summary.`
   }];
@@ -633,16 +642,16 @@ async function artefactsGuideData(catalystApp) {
   });
 
   // Section 6: Support Function
-  const openConflicts = conflictRows.filter(c => c.status !== 'resolved');
+  const openConflicts = conflictRows.filter(c => c.resolution_status !== 'resolved');
   sections.push({
     id: 'support-function',
     title: 'Support Function',
     artefacts: openConflicts.map(c => ({
       name: c.description || 'Unresolved conflict',
       type: 'Conflict Resolution',
-      description: `Type: ${c.conflict_type || 'unknown'} — Stage: ${c.journey_stage || 'unknown'}`,
+      description: `Type: ${c.type || 'unknown'}`,
       priority: 'high',
-      stage: c.journey_stage || ''
+      stage: ''
     }))
   });
 
