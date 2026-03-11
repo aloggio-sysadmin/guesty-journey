@@ -1,4 +1,4 @@
-import { FONTS_LINK, esc, openReportWindow } from './shared-styles.js';
+import { FONTS_LINK, DOWNLOAD_BAR_HTML, REPORT_DOWNLOAD_CSS, esc, openReportWindow } from './shared-styles.js';
 
 export function generateOperationalReport(data) {
   const stats = data.stats || {};
@@ -83,6 +83,7 @@ tr:nth-child(even) td { background: #FAFBFD; }
   .section { page-break-inside: avoid; }
   .no-print { display: none !important; }
 }
+${REPORT_DOWNLOAD_CSS}
 </style>
 </head><body>
 
@@ -311,6 +312,7 @@ tr:nth-child(even) td { background: #FAFBFD; }
 
 </div>
 
+${DOWNLOAD_BAR_HTML}
 </body></html>`;
 
   openReportWindow(html, 'Operational Report');

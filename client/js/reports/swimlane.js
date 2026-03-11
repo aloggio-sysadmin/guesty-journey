@@ -1,4 +1,4 @@
-import { FONTS_LINK, BASE_CSS, esc, openReportWindow, formatList } from './shared-styles.js';
+import { FONTS_LINK, BASE_CSS, DOWNLOAD_BAR_HTML, esc, openReportWindow, formatList } from './shared-styles.js';
 
 const PHASE_MAP = {
   discovery: ['discovery', 'pre_booking', 'pre-booking', 'search', 'research'],
@@ -307,6 +307,7 @@ ${BASE_CSS}
   ${supportSection}
 </div>
 
+${DOWNLOAD_BAR_HTML}
 </body></html>`;
 
   openReportWindow(html, 'Guest Journey Swimlane');

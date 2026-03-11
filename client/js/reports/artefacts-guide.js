@@ -1,4 +1,4 @@
-import { FONTS_LINK, BASE_CSS, esc, openReportWindow } from './shared-styles.js';
+import { FONTS_LINK, BASE_CSS, DOWNLOAD_BAR_HTML, esc, openReportWindow } from './shared-styles.js';
 
 const PRIORITY_BADGE = {
   critical: '<span class="badge badge-crit">Critical</span>',
@@ -233,6 +233,7 @@ ${BASE_CSS}
   </div>` : ''}
 </div>
 
+${DOWNLOAD_BAR_HTML}
 </body></html>`;
 
   openReportWindow(html, 'Supporting Artefacts Guide');
