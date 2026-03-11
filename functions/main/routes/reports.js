@@ -10,7 +10,7 @@ const { getConfig } = require('../config');
  * Returns all JourneyMap stages with parsed JSON arrays.
  */
 async function journeyMap(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT * FROM JourneyMap ORDER BY journey_stage');
+  const rows = await query(catalystApp, 'SELECT stage_id, journey_stage, stage_description, guest_actions_json, frontstage_interactions_json, backstage_processes_json, technology_touchpoints_json, failure_points_json, supporting_sme_ids_json FROM JourneyMap ORDER BY journey_stage');
   const stages = rows.map(r => ({
     stage_id: r.stage_id,
     journey_stage: r.journey_stage,
@@ -50,7 +50,7 @@ async function journeyMap(catalystApp) {
  * Returns all ProcessInventory records enriched with owner SME name.
  */
 async function processInventory(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT * FROM ProcessInventory ORDER BY journey_stage, process_name');
+  const rows = await query(catalystApp, 'SELECT process_id, process_name, journey_stage, sub_stage, maturity, discrepancy_flag, discrepancy_notes, as_documented, as_practiced, steps_json, conflict_flag, owner_sme_id, source_sme_ids_json FROM ProcessInventory ORDER BY journey_stage, process_name');
 
   const smeCache = {};
   const getSme = async (smeId) => {
@@ -101,7 +101,7 @@ async function processInventory(catalystApp) {
  * Returns all TechEcosystem records.
  */
 async function techEcosystem(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT * FROM TechEcosystem ORDER BY category, system_name');
+  const rows = await query(catalystApp, 'SELECT system_id, system_name, vendor, category, environment, integration_links_json, manual_workarounds_json, users_json, source_sme_ids_json FROM TechEcosystem ORDER BY category, system_name');
 
   const systems = rows.map(s => ({
     system_id: s.system_id,
@@ -139,7 +139,7 @@ async function techEcosystem(catalystApp) {
  * Returns all GapRegister records.
  */
 async function gapOpportunity(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT * FROM GapRegister ORDER BY guest_impact DESC, journey_stage_id');
+  const rows = await query(catalystApp, 'SELECT gap_id, title, description, journey_stage_id, process_id, gap_type, root_cause, frequency, guest_impact, business_impact, financial_impact_estimate, confirmed_by_multiple_smes, status, opportunity_json FROM GapRegister ORDER BY guest_impact DESC, journey_stage_id');
 
   const gaps = rows.map(g => ({
     gap_id: g.gap_id,
@@ -185,7 +185,7 @@ async function gapOpportunity(catalystApp) {
  * Returns all ConflictLog records with resolution status.
  */
 async function conflictResolution(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT * FROM ConflictLog ORDER BY resolution_status');
+  const rows = await query(catalystApp, 'SELECT conflict_id, description, type, sme_a_id, sme_b_id, resolution_status, resolution_notes, resolved_by, created_at FROM ConflictLog ORDER BY resolution_status');
 
   const smeCache = {};
   const getSme = async (smeId) => {
@@ -328,7 +328,7 @@ Generate a comprehensive executive summary.`
  */
 async function techLandscapeData(catalystApp) {
   const [sysRows, stageRows] = await Promise.all([
-    query(catalystApp, 'SELECT * FROM TechEcosystem ORDER BY category, system_name'),
+    query(catalystApp, 'SELECT system_id, system_name, vendor, category, environment, integration_links_json, manual_workarounds_json, users_json, source_sme_ids_json FROM TechEcosystem ORDER BY category, system_name'),
     query(catalystApp, 'SELECT stage_id, journey_stage, technology_touchpoints_json FROM JourneyMap')
   ]);
 
@@ -379,7 +379,7 @@ async function techLandscapeData(catalystApp) {
  * Stages with phase groupings for Mermaid.js flowchart.
  */
 async function journeyDiagramData(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT * FROM JourneyMap ORDER BY ROWID');
+  const rows = await query(catalystApp, 'SELECT stage_id, journey_stage, stage_description, guest_actions_json, frontstage_interactions_json, backstage_processes_json, technology_touchpoints_json, failure_points_json, supporting_sme_ids_json FROM JourneyMap ORDER BY ROWID');
 
   const PHASE_MAP = {
     discovery: ['discovery', 'pre_booking', 'pre-booking'],
@@ -431,9 +431,9 @@ async function journeyDiagramData(catalystApp) {
  */
 async function swimlaneData(catalystApp) {
   const [stageRows, processRows, gapRows, smeRows] = await Promise.all([
-    query(catalystApp, 'SELECT * FROM JourneyMap ORDER BY ROWID'),
-    query(catalystApp, 'SELECT * FROM ProcessInventory ORDER BY journey_stage'),
-    query(catalystApp, 'SELECT * FROM GapRegister ORDER BY journey_stage_id'),
+    query(catalystApp, 'SELECT stage_id, journey_stage, stage_description, guest_actions_json, frontstage_interactions_json, backstage_processes_json, technology_touchpoints_json, failure_points_json, supporting_sme_ids_json FROM JourneyMap ORDER BY ROWID'),
+    query(catalystApp, 'SELECT process_id, process_name, journey_stage, sub_stage, maturity, discrepancy_flag, discrepancy_notes, as_documented, as_practiced, steps_json, conflict_flag, owner_sme_id, source_sme_ids_json FROM ProcessInventory ORDER BY journey_stage'),
+    query(catalystApp, 'SELECT gap_id, title, description, journey_stage_id, process_id, gap_type, root_cause, frequency, guest_impact, business_impact, financial_impact_estimate, confirmed_by_multiple_smes, status, opportunity_json FROM GapRegister ORDER BY journey_stage_id'),
     query(catalystApp, 'SELECT sme_id, full_name, department, role, journey_stages_owned_json FROM SMERegister')
   ]);
 
@@ -509,10 +509,10 @@ async function swimlaneData(catalystApp) {
  */
 async function artefactsGuideData(catalystApp) {
   const [processRows, gapRows, systemRows, conflictRows] = await Promise.all([
-    query(catalystApp, 'SELECT * FROM ProcessInventory'),
-    query(catalystApp, 'SELECT * FROM GapRegister'),
-    query(catalystApp, 'SELECT * FROM TechEcosystem'),
-    query(catalystApp, 'SELECT * FROM ConflictLog')
+    query(catalystApp, 'SELECT process_id, process_name, journey_stage, sub_stage, maturity, discrepancy_flag, discrepancy_notes, as_documented, as_practiced, steps_json, conflict_flag, owner_sme_id, source_sme_ids_json FROM ProcessInventory'),
+    query(catalystApp, 'SELECT gap_id, title, description, journey_stage_id, process_id, gap_type, root_cause, frequency, guest_impact, business_impact, financial_impact_estimate, confirmed_by_multiple_smes, status, opportunity_json FROM GapRegister'),
+    query(catalystApp, 'SELECT system_id, system_name, vendor, category, environment, integration_links_json, manual_workarounds_json, users_json, source_sme_ids_json FROM TechEcosystem'),
+    query(catalystApp, 'SELECT conflict_id, description, type, sme_a_id, sme_b_id, resolution_status, resolution_notes, resolved_by, created_at FROM ConflictLog')
   ]);
 
   const sections = [];
@@ -714,7 +714,7 @@ async function journeySpreadsheetData(catalystApp) {
     techEcosystem(catalystApp),
     gapOpportunity(catalystApp),
     conflictResolution(catalystApp),
-    query(catalystApp, 'SELECT * FROM SMERegister')
+    query(catalystApp, 'SELECT sme_id, full_name, department, role, interview_status, journey_stages_owned_json, contact_json FROM SMERegister')
   ]);
 
   const smes = smeRows.map(s => {
