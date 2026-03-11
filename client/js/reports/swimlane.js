@@ -104,7 +104,7 @@ export function generateSwimlane(data) {
           ${s.guest_actions.length ? '<div class="event-label">Guest Actions</div>' : ''}
           ${formatList(s.guest_actions)}
         </div>
-        <div class="col-owner">
+        <div class="col-ops">
           ${s.frontstage_interactions.length ? '<div class="event-label">Frontstage</div>' : ''}
           ${formatList(s.frontstage_interactions)}
           ${s.backstage_processes.length ? '<div class="event-label" style="margin-top:8px">Backstage</div>' : ''}
@@ -214,7 +214,7 @@ ${BASE_CSS}
 .col-stage .stage-id { font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.45); letter-spacing: 0.1em; }
 .col-stage .stage-name { font-size: 12px; font-weight: 700; color: #fff; line-height: 1.3; }
 .col-stage .stage-team { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; line-height: 1.3; }
-.col-guest, .col-owner, .col-fin, .col-touch, .col-risk {
+.col-guest, .col-ops, .col-fin, .col-touch, .col-risk {
   padding: 14px 16px; border-right: 1px solid var(--border);
   font-size: 12px; line-height: 1.55; color: var(--ink2);
   display: flex; flex-direction: column; justify-content: center; gap: 4px;
@@ -296,7 +296,7 @@ ${BASE_CSS}
     <div class="lane-headers">
       <div class="lane-header">Stage</div>
       <div class="lane-header" style="color:#A8D4F5">Guest Journey</div>
-      <div class="lane-header" style="color:#A8E6C4">Owner Impact</div>
+      <div class="lane-header" style="color:#A8E6C4">Operations</div>
       <div class="lane-header" style="color:var(--trust)">Financial</div>
       <div class="lane-header" style="color:#F0E68C">Touchpoints</div>
       <div class="lane-header" style="color:#FFB3B3">Risk</div>

@@ -161,7 +161,7 @@ ${REPORT_DOWNLOAD_CSS}
     <div class="section-title">Process Inventory & Maturity Assessment</div>
     <div class="section-narrative">${processes.process_count || 0} operational processes have been documented across the guest journey. ${processes.discrepancy_count || 0} discrepancies were identified between documented procedures and actual practice. ${processes.conflict_count || 0} process conflicts have been flagged for resolution.</div>
     <table>
-      <thead><tr><th>Process</th><th>Stage</th><th>Maturity</th><th>Discrepancy</th><th>Owner</th></tr></thead>
+      <thead><tr><th>Process</th><th>Stage</th><th>Maturity</th><th>Discrepancy</th><th>Responsible</th></tr></thead>
       <tbody>${(processes.processes || []).map(p => `
         <tr>
           <td><strong>${esc(p.process_name)}</strong></td>

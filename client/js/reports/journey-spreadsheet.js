@@ -84,7 +84,7 @@ export async function generateJourneySpreadsheet(data) {
 
   // ── Sheet 2: Process Inventory ──
   const procs = (data.processes && data.processes.processes) || [];
-  const piData = [['Process', 'Stage', 'Sub-Stage', 'Maturity', 'Discrepancy', 'Discrepancy Notes', 'As Documented', 'As Practiced', 'Owner', 'Conflict']];
+  const piData = [['Process', 'Stage', 'Sub-Stage', 'Maturity', 'Discrepancy', 'Discrepancy Notes', 'As Documented', 'As Practiced', 'Responsible', 'Conflict']];
   for (const p of procs) {
     piData.push([
       p.process_name, p.journey_stage, p.sub_stage || '',

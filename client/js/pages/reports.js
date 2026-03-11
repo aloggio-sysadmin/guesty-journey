@@ -139,7 +139,8 @@ export default function renderReports(container) {
       </div>
     </div>`;
 
-  container.addEventListener('click', async (e) => {
+  // Remove prior listener to prevent duplicate tabs on re-render
+  const handler = async (e) => {
     const btn = e.target.closest('[data-generate]');
     if (!btn) return;
     const reportId = btn.dataset.generate;
@@ -164,7 +165,12 @@ export default function renderReports(container) {
       btn.disabled = false;
       btn.textContent = 'Generate';
     }
-  });
+  };
+  if (container._reportClickHandler) {
+    container.removeEventListener('click', container._reportClickHandler);
+  }
+  container._reportClickHandler = handler;
+  container.addEventListener('click', handler);
 }
 
 function showReportModal(report, data) {
