@@ -1,4 +1,4 @@
-import { FONTS_LINK, BASE_CSS, esc, openReportWindow } from './shared-styles.js';
+import { FONTS_LINK, BASE_CSS, DOWNLOAD_BAR_HTML, esc, openReportWindow } from './shared-styles.js';
 
 const PHASE_LABELS = {
   discovery: { label: 'Discovery', color: '#2E75B6', emoji: '🔍' },
@@ -308,6 +308,7 @@ ${BASE_CSS}
   scrollEl.addEventListener('mouseleave', function() { isDragging = false; });
 })();
 <\/script>
+${DOWNLOAD_BAR_HTML}
 </body></html>`;
 
   openReportWindow(html, 'Journey Flow Diagram');

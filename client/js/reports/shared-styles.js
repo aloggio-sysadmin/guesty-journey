@@ -40,13 +40,59 @@ body { font-family: 'DM Sans', sans-serif; background: #0E1621; color: var(--ink
 .badge-high { background: var(--high-l); color: var(--high); }
 .badge-med  { background: var(--med-l); color: var(--med); }
 .badge-mid  { background: var(--light); color: var(--mid); }
+/* Download bar */
+.download-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
+  background: linear-gradient(180deg, rgba(14,22,33,0.95), rgba(14,22,33,0.99));
+  backdrop-filter: blur(8px); border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 12px 48px; display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+}
+.dl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 20px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.03em; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); cursor: pointer;
+  transition: all 0.15s;
+}
+.dl-btn:hover { background: var(--mid); border-color: var(--mid); color: #fff; }
+.dl-btn svg { width: 14px; height: 14px; }
 @media print {
   body { background: #fff; }
   .page-header { position: static; background: var(--navy); }
   .stats-bar { background: #f5f5f5; }
-  .no-print { display: none !important; }
+  .no-print, .download-bar { display: none !important; }
 }
 `;
+
+/** CSS for the operational report (white background, no download bar dark theme) */
+export const REPORT_DOWNLOAD_CSS = `
+.download-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 999;
+  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.99));
+  backdrop-filter: blur(8px); border-top: 1px solid var(--border);
+  padding: 12px 48px; display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+}
+.dl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 20px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.03em; border: 1px solid var(--border); border-radius: 6px;
+  background: #fff; color: var(--navy); cursor: pointer; transition: all 0.15s;
+}
+.dl-btn:hover { background: var(--mid); border-color: var(--mid); color: #fff; }
+.dl-btn svg { width: 14px; height: 14px; }
+@media print {
+  .download-bar { display: none !important; }
+}
+`;
+
+const DOWNLOAD_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+
+export const DOWNLOAD_BAR_HTML = `
+<div class="download-bar no-print">
+  <button class="dl-btn" onclick="window.print()" title="Save as PDF via Print dialog">
+    ${DOWNLOAD_ICON} Download PDF
+  </button>
+</div>`;
 
 export function esc(str) {
   if (!str) return '';
