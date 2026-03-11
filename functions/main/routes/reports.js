@@ -240,13 +240,13 @@ async function executiveSummary(catalystApp) {
   // Gather counts in parallel
   const [smeRows, sessionRows, processRows, gapRows, conflictRows, systemRows, stageRows] =
     await Promise.all([
-      query(catalystApp, 'SELECT COUNT(*) as cnt FROM SMERegister'),
-      query(catalystApp, 'SELECT COUNT(*) as cnt FROM Sessions'),
-      query(catalystApp, 'SELECT COUNT(*) as cnt FROM ProcessInventory'),
-      query(catalystApp, 'SELECT COUNT(*) as cnt FROM GapRegister'),
-      query(catalystApp, 'SELECT COUNT(*) as cnt FROM ConflictLog'),
-      query(catalystApp, 'SELECT COUNT(*) as cnt FROM TechEcosystem'),
-      query(catalystApp, 'SELECT COUNT(*) as cnt FROM JourneyMap')
+      query(catalystApp, 'SELECT COUNT(ROWID) as cnt FROM SMERegister'),
+      query(catalystApp, 'SELECT COUNT(ROWID) as cnt FROM Sessions'),
+      query(catalystApp, 'SELECT COUNT(ROWID) as cnt FROM ProcessInventory'),
+      query(catalystApp, 'SELECT COUNT(ROWID) as cnt FROM GapRegister'),
+      query(catalystApp, 'SELECT COUNT(ROWID) as cnt FROM ConflictLog'),
+      query(catalystApp, 'SELECT COUNT(ROWID) as cnt FROM TechEcosystem'),
+      query(catalystApp, 'SELECT COUNT(ROWID) as cnt FROM JourneyMap')
     ]);
 
   const getCount = (rows) => parseInt(rows[0]?.cnt || rows[0]?.CNT || '0', 10) || 0;

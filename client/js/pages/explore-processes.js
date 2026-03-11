@@ -14,7 +14,7 @@ export default async function renderProcesses(container) {
     render(all.filter(p => (!stage||p.journey_stage===stage)&&(!mat||p.maturity===mat)));
   }
   function render(procs) {
-    document.getElementById('process-table').innerHTML = `<div class="card"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Stage</th><th>Maturity</th><th>Owner</th><th>Discrepancy</th></tr></thead><tbody>
+    document.getElementById('process-table').innerHTML = `<div class="card"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Stage</th><th>Maturity</th><th>Responsible</th><th>Discrepancy</th></tr></thead><tbody>
       ${procs.length===0?`<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-secondary)">No processes found</td></tr>`:
       procs.map(p=>`<tr style="cursor:pointer" onclick="showProcessDetail('${p.process_id}')">
         <td><code>${p.process_id}</code></td><td><strong>${p.process_name}</strong></td>
