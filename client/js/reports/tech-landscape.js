@@ -1,4 +1,4 @@
-import { FONTS_LINK, BASE_CSS, esc, openReportWindow } from './shared-styles.js';
+import { FONTS_LINK, BASE_CSS, DOWNLOAD_BAR_HTML, esc, openReportWindow } from './shared-styles.js';
 
 const CAT_COLORS = {
   'Property Management':         { bg: '#D6E4F0', h: '#2E75B6' },
@@ -299,6 +299,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 <\/script>
+${DOWNLOAD_BAR_HTML}
 </body></html>`;
 
   openReportWindow(html, 'Technology Landscape');
