@@ -1,6 +1,19 @@
 import { chat as chatApi, sme as smeApi } from '../api.js';
 import { toast } from '../components/toast.js';
 
+const ROLE_STAGE_MAP = {
+  'Regional General Manager':                       ['discovery', 'booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay', 're_engagement'],
+  'Holiday / Hotel / Park Manager':                 ['discovery', 'booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay', 're_engagement'],
+  'Assistant Holiday Manager, Hotel Operations':    ['booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay'],
+  'Client Services':                                ['discovery', 'booking', 'pre_arrival', 'post_stay', 're_engagement'],
+  'Host / Inspector':                               ['pre_arrival', 'check_in', 'in_stay', 'check_out'],
+  'Reservations & Guest Services':                  ['discovery', 'booking', 'pre_arrival'],
+  'Call Centre Manager':                            ['discovery', 'booking', 'pre_arrival', 'post_stay'],
+  'Trust':                                          ['booking', 'check_out', 'post_stay'],
+};
+
+const ROLES = Object.keys(ROLE_STAGE_MAP);
+
 const STAGES = [
   { id: 'discovery',      label: 'Discovery',      tip: 'Guest researches options, reads reviews, compares properties' },
   { id: 'booking',        label: 'Booking',         tip: 'Guest selects dates, makes a reservation, receives confirmation' },
@@ -22,7 +35,14 @@ export default async function renderChatNew(container) {
           <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px">Add a new Subject Matter Expert to the register. No session will be started.</p>
           <form id="new-sme-form">
             <div class="form-group"><label>Full Name *</label><input class="form-control" id="sme-name" required></div>
-            <div class="form-group"><label>Role *</label><input class="form-control" id="sme-role" required placeholder="e.g. Front Desk Manager"></div>
+            <div class="form-group"><label>Role *</label>
+              <select class="form-control" id="sme-role" required>
+                <option value="">Select a role...</option>
+                ${ROLES.map(r => `<option value="${r}">${r}</option>`).join('')}
+                <option value="__other__">Other</option>
+              </select>
+              <input class="form-control" id="sme-role-other" placeholder="Enter custom role" style="display:none;margin-top:6px">
+            </div>
             <div class="form-group"><label>Department</label><input class="form-control" id="sme-dept" placeholder="e.g. Operations"></div>
             <div class="form-group"><label>Email *</label><input class="form-control" type="email" id="sme-email" placeholder="sme@company.com" required></div>
             <div class="form-group"><label>Location</label><input class="form-control" id="sme-loc"></div>
@@ -41,6 +61,20 @@ export default async function renderChatNew(container) {
         </div>
       </div>
     </div>`;
+
+  // Role dropdown → auto-select journey stages
+  const roleSelect = container.querySelector('#sme-role');
+  const roleOther = container.querySelector('#sme-role-other');
+  roleSelect.addEventListener('change', () => {
+    const val = roleSelect.value;
+    roleOther.style.display = val === '__other__' ? '' : 'none';
+    if (val === '__other__') { roleOther.focus(); return; }
+    const mapped = ROLE_STAGE_MAP[val];
+    if (!mapped) return;
+    container.querySelectorAll('input[name="stage"]').forEach(cb => {
+      cb.checked = mapped.includes(cb.value);
+    });
+  });
 
   // Load existing SMEs for the session dropdown
   try {
@@ -83,7 +117,7 @@ export default async function renderChatNew(container) {
     try {
       const newSme = await smeApi.create({
         full_name: container.querySelector('#sme-name').value,
-        role: container.querySelector('#sme-role').value,
+        role: roleSelect.value === '__other__' ? roleOther.value : roleSelect.value,
         department: container.querySelector('#sme-dept').value || '',
         location: container.querySelector('#sme-loc').value || '',
         contact_json: { email },
