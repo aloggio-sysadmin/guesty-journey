@@ -198,4 +198,114 @@ async function remove(catalystApp, params) {
   return { success: true, deleted: params.id };
 }
 
-module.exports = { create, list, get, update: update_sme, validate: validate_sme, sendLink, remove };
+// GET /sme/zoho-people — Fetch employees from Zoho People filtered by approved roles
+const APPROVED_ROLES = [
+  'Regional General Manager',
+  'Holiday / Hotel / Park Manager',
+  'Assistant Holiday Manager, Hotel Operations',
+  'Client Services',
+  'Host / Inspector',
+  'Reservations & Guest Services',
+  'Call Centre Manager',
+  'Trust',
+  'Marketing / Digital Marketing',
+  'Regulatory & Compliance'
+];
+
+async function fetchZohoPeople(catalystApp) {
+  let accessToken;
+  try {
+    const connector = catalystApp.connection();
+    const connectorDetails = await connector.getConnector('peopleconn');
+    accessToken = connectorDetails.access_token;
+  } catch (err) {
+    console.error('[sme] Zoho People connector error:', err.message);
+    const e = new Error('Zoho People connector not configured. Set up the "zohopeople" connector in Catalyst console.');
+    e.status = 503;
+    throw e;
+  }
+
+  // Fetch employees from Zoho People API (.com.au for AU datacenter)
+  const https = require('https');
+  const fetchPage = (index) => new Promise((resolve, reject) => {
+    const url = `https://people.zoho.com.au/people/api/forms/employee/getRecords?sIndex=${index}&limit=200`;
+    const req = https.get(url, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(body)); }
+        catch { resolve({ response: { result: [] } }); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Zoho People API timeout')); });
+  });
+
+  // Fetch up to 3 pages (600 employees max)
+  const allEmployees = [];
+  for (let page = 1; page <= 3; page++) {
+    const data = await fetchPage(page);
+    const results = data.response?.result || [];
+    if (!Array.isArray(results) || results.length === 0) break;
+    for (const row of results) {
+      const emp = typeof row === 'object' ? (row[Object.keys(row)[0]] || row) : row;
+      allEmployees.push({
+        employee_id: emp.EmployeeID || emp.Employeeid || '',
+        first_name: emp.FirstName || emp['First Name'] || '',
+        last_name: emp.LastName || emp['Last Name'] || '',
+        full_name: `${emp.FirstName || emp['First Name'] || ''} ${emp.LastName || emp['Last Name'] || ''}`.trim(),
+        email: emp.EmailID || emp['Email ID'] || emp.Work_Email || '',
+        designation: emp.Designation || emp.JobTitle || emp['Job Title'] || '',
+        department: emp.Department || '',
+        location: emp.Location || emp.Work_Location || ''
+      });
+    }
+    if (results.length < 200) break;
+  }
+
+  // Filter to approved roles (case-insensitive partial match)
+  const matched = allEmployees.filter(emp => {
+    const desig = (emp.designation || '').toLowerCase();
+    return APPROVED_ROLES.some(role => {
+      const roleLower = role.toLowerCase();
+      return desig === roleLower ||
+        desig.includes(roleLower) ||
+        roleLower.includes(desig);
+    });
+  });
+
+  // Match each employee to the closest approved role
+  for (const emp of matched) {
+    const desig = (emp.designation || '').toLowerCase();
+    emp.matched_role = APPROVED_ROLES.find(role => {
+      const r = role.toLowerCase();
+      return desig === r || desig.includes(r) || r.includes(desig);
+    }) || emp.designation;
+  }
+
+  // Check which employees are already registered as SMEs
+  const existingSmes = await query(catalystApp, 'SELECT full_name, contact_json FROM SMERegister');
+  const existingEmails = new Set();
+  const existingNames = new Set();
+  for (const s of existingSmes) {
+    existingNames.add((s.full_name || '').toLowerCase());
+    const contact = safeParse(s.contact_json, {});
+    if (contact.email) existingEmails.add(contact.email.toLowerCase());
+  }
+
+  for (const emp of matched) {
+    emp.already_registered = existingEmails.has((emp.email || '').toLowerCase()) ||
+      existingNames.has((emp.full_name || '').toLowerCase());
+  }
+
+  return {
+    total_employees: allEmployees.length,
+    matched_count: matched.length,
+    approved_roles: APPROVED_ROLES,
+    employees: matched
+  };
+}
+
+module.exports = { create, list, get, update: update_sme, validate: validate_sme, sendLink, remove, fetchZohoPeople };
