@@ -137,6 +137,7 @@ function buildRouteTable() {
     { method: 'POST', pattern: '/chat/:sessionId/action',   handler: chatRoutes.quickAction },
     { method: 'POST', pattern: '/chat/:sessionId/close',    handler: chatRoutes.closeSession },
     // SME
+    { method: 'GET',  pattern: '/sme/zoho-people',           handler: smeRoutes.fetchZohoPeople },
     { method: 'POST', pattern: '/sme',                      handler: smeRoutes.create },
     { method: 'GET',  pattern: '/sme',                      handler: smeRoutes.list },
     { method: 'GET',  pattern: '/sme/:id',                  handler: smeRoutes.get },

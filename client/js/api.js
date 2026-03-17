@@ -60,6 +60,7 @@ export const sme = {
   remove: (id) => apiCall('DELETE', `/sme/${id}`),
   listSopFiles: (smeId) => apiCall('GET', `/files/sop/${smeId}`),
   downloadSop: (smeId, stage) => apiCall('GET', `/files/sop/${smeId}/${stage}/download`),
+  fetchZohoPeople: () => apiCall('GET', '/sme/zoho-people'),
 };
 
 export const tech = {

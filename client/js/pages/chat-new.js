@@ -62,6 +62,17 @@ export default async function renderChatNew(container) {
           <div id="sme-select-area"><div class="loading-center"><div class="spinner"></div></div></div>
         </div>
       </div>
+
+      <div class="card" style="max-width:900px;margin-top:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div class="card-title">Import from Zoho People</div>
+            <p style="color:var(--text-secondary);font-size:13px;margin:0">Fetch employees in approved guest-facing roles and register them as SMEs.</p>
+          </div>
+          <button class="btn btn-primary" id="import-zoho-btn">Fetch Employees</button>
+        </div>
+        <div id="zoho-import-area" style="margin-top:16px"></div>
+      </div>
     </div>`;
 
   // Role dropdown → auto-select journey stages
@@ -76,6 +87,90 @@ export default async function renderChatNew(container) {
     container.querySelectorAll('input[name="stage"]').forEach(cb => {
       cb.checked = mapped.includes(cb.value);
     });
+  });
+
+  // Import from Zoho People
+  container.querySelector('#import-zoho-btn').addEventListener('click', async () => {
+    const btn = container.querySelector('#import-zoho-btn');
+    const area = container.querySelector('#zoho-import-area');
+    btn.disabled = true; btn.textContent = 'Fetching...';
+    area.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+    try {
+      const data = await smeApi.fetchZohoPeople();
+      const employees = data.employees || [];
+      if (!employees.length) {
+        area.innerHTML = '<p style="color:var(--text-secondary);font-size:13px">No employees found matching approved roles.</p>';
+        btn.disabled = false; btn.textContent = 'Fetch Employees';
+        return;
+      }
+      area.innerHTML = `
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">${data.matched_count} employee(s) found matching approved roles (out of ${data.total_employees} total)</div>
+        <div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+          <table style="width:100%;font-size:13px;border-collapse:collapse">
+            <thead><tr style="background:var(--bg-secondary);position:sticky;top:0">
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)"><input type="checkbox" id="zoho-select-all"></th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Name</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Role</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Department</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Status</th>
+            </tr></thead>
+            <tbody>${employees.map((emp, i) => `
+              <tr style="border-bottom:1px solid var(--border)${emp.already_registered ? ';opacity:0.5' : ''}">
+                <td style="padding:6px 10px"><input type="checkbox" class="zoho-emp-cb" data-idx="${i}" ${emp.already_registered ? 'disabled' : ''}></td>
+                <td style="padding:6px 10px">${emp.full_name}</td>
+                <td style="padding:6px 10px">${emp.matched_role || emp.designation}</td>
+                <td style="padding:6px 10px">${emp.department || '--'}</td>
+                <td style="padding:6px 10px">${emp.already_registered ? '<span style="color:var(--success);font-weight:600">Registered</span>' : '<span style="color:var(--text-secondary)">New</span>'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+          <span style="font-size:12px;color:var(--text-secondary)" id="zoho-selected-count">0 selected</span>
+          <button class="btn btn-success" id="zoho-import-selected-btn" disabled>Import Selected as SMEs</button>
+        </div>`;
+
+      // Store employee data for import
+      area._employees = employees;
+
+      // Select all toggle
+      area.querySelector('#zoho-select-all').addEventListener('change', (e) => {
+        area.querySelectorAll('.zoho-emp-cb:not(:disabled)').forEach(cb => { cb.checked = e.target.checked; });
+        updateZohoCount(area);
+      });
+      area.querySelectorAll('.zoho-emp-cb').forEach(cb => cb.addEventListener('change', () => updateZohoCount(area)));
+
+      // Import selected
+      area.querySelector('#zoho-import-selected-btn').addEventListener('click', async () => {
+        const importBtn = area.querySelector('#zoho-import-selected-btn');
+        importBtn.disabled = true; importBtn.textContent = 'Importing...';
+        const selected = [...area.querySelectorAll('.zoho-emp-cb:checked')].map(cb => employees[cb.dataset.idx]);
+        let imported = 0;
+        for (const emp of selected) {
+          try {
+            const stages = ROLE_STAGE_MAP[emp.matched_role] || [];
+            await smeApi.create({
+              full_name: emp.full_name,
+              role: emp.matched_role || emp.designation,
+              department: emp.department || '',
+              location: emp.location || '',
+              contact_json: { email: emp.email },
+              journey_stages_owned_json: stages,
+            });
+            imported++;
+          } catch (err) {
+            console.error(`Failed to import ${emp.full_name}:`, err.message);
+          }
+        }
+        toast(`Imported ${imported} of ${selected.length} employees as SMEs`, 'success');
+        // Refresh page to show new SMEs in session dropdown
+        renderChatNew(container);
+      });
+
+    } catch (err) {
+      area.innerHTML = `<p style="color:var(--error);font-size:13px">${err.message}</p>`;
+    }
+    btn.disabled = false; btn.textContent = 'Fetch Employees';
   });
 
   // Load existing SMEs for the session dropdown
@@ -133,6 +228,12 @@ export default async function renderChatNew(container) {
       btn.disabled = false; btn.textContent = 'Register SME';
     }
   });
+}
+
+function updateZohoCount(area) {
+  const checked = area.querySelectorAll('.zoho-emp-cb:checked').length;
+  area.querySelector('#zoho-selected-count').textContent = `${checked} selected`;
+  area.querySelector('#zoho-import-selected-btn').disabled = checked === 0;
 }
 
 function showSendLinkPrompt(container, sme) {
