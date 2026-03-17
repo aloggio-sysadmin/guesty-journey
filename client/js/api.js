@@ -61,6 +61,7 @@ export const sme = {
   listSopFiles: (smeId) => apiCall('GET', `/files/sop/${smeId}`),
   downloadSop: (smeId, stage) => apiCall('GET', `/files/sop/${smeId}/${stage}/download`),
   fetchZohoPeople: () => apiCall('GET', '/sme/zoho-people'),
+  debugZohoPeople: () => apiCall('GET', '/sme/zoho-people?debug=true'),
 };
 
 export const tech = {
