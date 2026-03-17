@@ -220,7 +220,7 @@ async function fetchZohoPeople(catalystApp) {
     accessToken = connectorDetails.access_token;
   } catch (err) {
     console.error('[sme] Zoho People connector error:', err.message);
-    const e = new Error('Zoho People connector not configured. Set up the "zohopeople" connector in Catalyst console.');
+    const e = new Error('Zoho People connector not configured. Set up the "peopleconn" connector in Catalyst console.');
     e.status = 503;
     throw e;
   }
