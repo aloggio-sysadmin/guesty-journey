@@ -113,11 +113,14 @@ export default async function renderChatNew(container) {
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Email</th>
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Role</th>
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Department</th>
-              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Status</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Zoho Status</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Import</th>
             </tr></thead>
             <tbody>${employees.map((emp, i) => {
               const noEmail = !emp.email;
               const disabled = emp.already_registered || noEmail;
+              const zohoStatus = emp.employee_status || '--';
+              const statusColor = zohoStatus.toLowerCase() === 'active' ? 'var(--success)' : 'var(--text-secondary)';
               return `
               <tr style="border-bottom:1px solid var(--border)${disabled ? ';opacity:0.5' : ''}" ${noEmail ? 'title="No email address — cannot import"' : ''}>
                 <td style="padding:6px 10px"><input type="checkbox" class="zoho-emp-cb" data-idx="${i}" ${disabled ? 'disabled' : ''}></td>
@@ -125,6 +128,7 @@ export default async function renderChatNew(container) {
                 <td style="padding:6px 10px">${emp.email || '<span style="color:var(--error);font-size:11px">Missing</span>'}</td>
                 <td style="padding:6px 10px">${emp.matched_role || emp.designation || '--'}</td>
                 <td style="padding:6px 10px">${emp.department || '--'}</td>
+                <td style="padding:6px 10px"><span style="color:${statusColor};font-size:12px">${zohoStatus}</span></td>
                 <td style="padding:6px 10px">${emp.already_registered ? '<span style="color:var(--success);font-weight:600">Registered</span>' : noEmail ? '<span style="color:var(--error)">No email</span>' : '<span style="color:var(--text-secondary)">New</span>'}</td>
               </tr>`;
             }).join('')}
