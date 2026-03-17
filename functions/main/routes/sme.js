@@ -215,12 +215,21 @@ const APPROVED_ROLES = [
 async function fetchZohoPeople(catalystApp) {
   let accessToken;
   try {
-    const connector = catalystApp.connection();
-    const connectorDetails = await connector.getConnector('peopleconn');
-    accessToken = connectorDetails.access_token;
+    const creds = await catalystApp.connections().getConnectionCredentials('peopleconn');
+    // The headers object contains the Authorization header with the OAuth token
+    const authHeader = creds.headers && creds.headers['Authorization'];
+    if (authHeader) {
+      accessToken = authHeader.replace(/^Zoho-oauthtoken\s+/i, '');
+    } else {
+      // Fallback: token may be in parameters
+      accessToken = creds.parameters && creds.parameters['access_token'];
+    }
+    if (!accessToken) {
+      throw new Error('No access token returned from connection credentials');
+    }
   } catch (err) {
     console.error('[sme] Zoho People connector error:', err.message);
-    const e = new Error('Zoho People connector not configured. Set up the "peopleconn" connector in Catalyst console.');
+    const e = new Error('Zoho People connection failed: ' + err.message);
     e.status = 503;
     throw e;
   }
