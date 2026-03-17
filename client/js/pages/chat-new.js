@@ -10,6 +10,8 @@ const ROLE_STAGE_MAP = {
   'Reservations & Guest Services':                  ['discovery', 'booking', 'pre_arrival'],
   'Call Centre Manager':                            ['discovery', 'booking', 'pre_arrival', 'post_stay'],
   'Trust':                                          ['booking', 'check_out', 'post_stay'],
+  'Marketing / Digital Marketing':                  ['discovery', 're_engagement'],
+  'Regulatory & Compliance':                        ['discovery', 'booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay', 're_engagement'],
 };
 
 const ROLES = Object.keys(ROLE_STAGE_MAP);
