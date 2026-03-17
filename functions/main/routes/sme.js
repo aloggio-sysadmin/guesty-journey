@@ -237,7 +237,7 @@ async function fetchZohoPeople(catalystApp) {
   // Fetch employees from Zoho People API (.com.au for AU datacenter)
   const https = require('https');
   const fetchPage = (index) => new Promise((resolve, reject) => {
-    const url = `https://people.zoho.com.au/people/api/forms/employee/getRecords?sIndex=${index}&limit=200`;
+    const url = `https://people.zoho.com.au/people/api/forms/employee/getRecords?sIndex=${index}&limit=200&searchColumn=Employeestatus&searchValue=Active`;
     const req = https.get(url, {
       headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
     }, (res) => {
