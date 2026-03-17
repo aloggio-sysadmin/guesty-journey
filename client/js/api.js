@@ -57,6 +57,7 @@ export const sme = {
   update: (id, data) => apiCall('PUT', `/sme/${id}`, data),
   validate: (id) => apiCall('POST', `/sme/${id}/validate`),
   sendLink: (id) => apiCall('POST', `/sme/${id}/send-link`),
+  bulkSendLinks: (smeIds) => apiCall('POST', '/sme/bulk-send-links', { sme_ids: smeIds }),
   remove: (id) => apiCall('DELETE', `/sme/${id}`),
   listSopFiles: (smeId) => apiCall('GET', `/files/sop/${smeId}`),
   downloadSop: (smeId, stage) => apiCall('GET', `/files/sop/${smeId}/${stage}/download`),

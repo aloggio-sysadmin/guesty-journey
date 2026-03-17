@@ -175,6 +175,68 @@ async function sendLink(catalystApp, params, body, user) {
   return { success: true, message: `Interview link sent to ${email}` };
 }
 
+// POST /sme/bulk-send-links
+async function bulkSendLinks(catalystApp, params, body, user) {
+  const smeIds = body.sme_ids;
+  if (!Array.isArray(smeIds) || smeIds.length === 0) {
+    const e = new Error('sme_ids must be a non-empty array');
+    e.status = 400;
+    throw e;
+  }
+
+  const config = await getConfig(catalystApp);
+  const emailService = catalystApp.email();
+  const domain = 'journey-7003032339.development.catalystserverless.com.au';
+  const results = [];
+
+  for (const smeId of smeIds) {
+    try {
+      const row = await getByField(catalystApp, 'SMERegister', 'sme_id', smeId);
+      if (!row) { results.push({ sme_id: smeId, success: false, error: 'SME not found' }); continue; }
+
+      const contact = safeParse(row.contact_json, {});
+      const email = contact.email;
+      if (!email) { results.push({ sme_id: smeId, full_name: row.full_name, success: false, error: 'No email address' }); continue; }
+
+      const token = jwt.sign(
+        { sme_id: smeId, purpose: 'sme_interview' },
+        config.JWT_SECRET,
+        { expiresIn: '72h' }
+      );
+      const link = `https://${domain}/app/index.html#/interview/${token}`;
+
+      await emailService.sendMail({
+        from_email: 'zoho-sysadmin@alloggio.com.au',
+        to_email: [email],
+        subject: 'Journey Mapping Interview — Your Session Link',
+        html_mode: true,
+        content: `<html><body style="font-family:sans-serif;color:#1e293b;padding:20px">
+          <h2>Guest Journey Mapping Interview</h2>
+          <p>Hi ${row.full_name},</p>
+          <p>You've been invited to participate in a guest journey mapping interview. Click the link below to start your session:</p>
+          <p style="margin:24px 0"><a href="${link}" style="background:#3b82f6;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Start Interview</a></p>
+          <p style="color:#64748b;font-size:13px">This link expires in 72 hours. If you have any questions, contact your project coordinator.</p>
+          <p style="color:#94a3b8;font-size:12px;margin-top:32px">Journey Mapping Agent</p>
+        </body></html>`
+      });
+
+      await update(catalystApp, 'SMERegister', row.ROWID, {
+        interview_status: 'link_sent',
+        updated_at: new Date().toISOString()
+      });
+
+      results.push({ sme_id: smeId, full_name: row.full_name, email, success: true });
+    } catch (err) {
+      console.error(`[sme] Bulk send error for ${smeId}:`, err.message);
+      results.push({ sme_id: smeId, success: false, error: err.message });
+    }
+  }
+
+  const sent = results.filter(r => r.success).length;
+  const failed = results.filter(r => !r.success).length;
+  return { success: true, sent, failed, total: smeIds.length, results };
+}
+
 // DELETE /sme/:id
 async function remove(catalystApp, params) {
   const sme = await getByField(catalystApp, 'SMERegister', 'sme_id', params.id);
@@ -430,4 +492,4 @@ async function fetchZohoPeople(catalystApp, params, body, user, queryParams) {
   };
 }
 
-module.exports = { create, list, get, update: update_sme, validate: validate_sme, sendLink, remove, fetchZohoPeople };
+module.exports = { create, list, get, update: update_sme, validate: validate_sme, sendLink, bulkSendLinks, remove, fetchZohoPeople };
