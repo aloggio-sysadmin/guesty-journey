@@ -36,7 +36,26 @@ function buildSystemPrompt({ sme, sessionState, existingRecords, openConflicts, 
     `- ${s.replace(/_/g, ' ')}: ${STAGE_DESCRIPTIONS[s] || s}`
   ).join('\n');
 
+  // Role-specific focus areas to tailor questions
+  const ROLE_FOCUS = {
+    'Regional General Manager': 'You are speaking with a senior leader who oversees multiple properties. Focus on strategic oversight, cross-property consistency, escalation paths, and how they ensure service quality across locations. Ask about their bird\'s-eye view of the guest experience and where they see the biggest operational challenges.',
+    'Holiday / Hotel / Park Manager': 'You are speaking with someone who manages a property day-to-day. Focus on on-the-ground operations, staff coordination, guest complaints handling, property-specific processes, and how they balance guest satisfaction with operational efficiency.',
+    'Assistant Holiday Manager, Hotel Operations': 'You are speaking with someone who supports property management and handles operational execution. Focus on hands-on processes, staff supervision, daily routines, guest issue resolution, and how they coordinate between departments.',
+    'Client Services': 'You are speaking with someone who is a primary point of contact for guests and property stakeholders. Focus on guest communications, enquiry handling, complaint resolution, pre/post-stay touchpoints, and how they manage guest expectations.',
+    'Host / Inspector': 'You are speaking with someone who physically inspects and prepares properties. Focus on property readiness standards, check-in/check-out inspections, quality assurance, what they look for during walkthroughs, and how they handle issues found on-site.',
+    'Reservations & Guest Services': 'You are speaking with someone who handles bookings and guest enquiries. Focus on the enquiry-to-booking process, channel management (phone, email, OTAs), rate handling, special requests, and how they communicate with guests before arrival.',
+    'Call Centre Manager': 'You are speaking with someone who manages inbound guest communications. Focus on call handling processes, common guest queries, escalation procedures, after-hours protocols, and how they measure service quality.',
+    'Trust': 'You are speaking with someone who handles trust accounting and financial compliance. Focus on trust account processes, payment handling, reconciliation, owner disbursements, financial reporting, and regulatory compliance around guest funds.',
+    'Marketing / Digital Marketing': 'You are speaking with someone who drives guest acquisition and re-engagement. Focus on how guests discover properties, digital channels, listing optimisation, campaign strategies, brand presence, and how they bring past guests back.',
+    'Regulatory & Compliance': 'You are speaking with someone who ensures regulatory adherence. Focus on compliance requirements at each stage, licensing, safety standards, data privacy (guest information handling), and how compliance intersects with the guest experience.',
+  };
+
+  const roleFocus = sme && sme.role && ROLE_FOCUS[sme.role]
+    ? `\nROLE CONTEXT:\n${ROLE_FOCUS[sme.role]}\nTailor your questions to this person's perspective and expertise. Ask about things they would directly know about or be responsible for in their role.\n`
+    : '';
+
   return `You are a friendly interviewer helping to map the guest journey at a hospitality company. You are speaking directly with a team member (Subject Matter Expert) who works in the business.
+${roleFocus}
 
 YOUR ROLE:
 - Have a warm, natural conversation — think of it as a friendly chat over coffee
