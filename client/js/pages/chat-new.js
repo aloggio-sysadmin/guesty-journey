@@ -110,18 +110,24 @@ export default async function renderChatNew(container) {
             <thead><tr style="background:var(--bg-secondary);position:sticky;top:0">
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)"><input type="checkbox" id="zoho-select-all"></th>
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Name</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Email</th>
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Role</th>
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Department</th>
               <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Status</th>
             </tr></thead>
-            <tbody>${employees.map((emp, i) => `
-              <tr style="border-bottom:1px solid var(--border)${emp.already_registered ? ';opacity:0.5' : ''}">
-                <td style="padding:6px 10px"><input type="checkbox" class="zoho-emp-cb" data-idx="${i}" ${emp.already_registered ? 'disabled' : ''}></td>
-                <td style="padding:6px 10px">${emp.full_name}</td>
-                <td style="padding:6px 10px">${emp.matched_role || emp.designation}</td>
+            <tbody>${employees.map((emp, i) => {
+              const noEmail = !emp.email;
+              const disabled = emp.already_registered || noEmail;
+              return `
+              <tr style="border-bottom:1px solid var(--border)${disabled ? ';opacity:0.5' : ''}" ${noEmail ? 'title="No email address — cannot import"' : ''}>
+                <td style="padding:6px 10px"><input type="checkbox" class="zoho-emp-cb" data-idx="${i}" ${disabled ? 'disabled' : ''}></td>
+                <td style="padding:6px 10px">${emp.full_name || '--'}</td>
+                <td style="padding:6px 10px">${emp.email || '<span style="color:var(--error);font-size:11px">Missing</span>'}</td>
+                <td style="padding:6px 10px">${emp.matched_role || emp.designation || '--'}</td>
                 <td style="padding:6px 10px">${emp.department || '--'}</td>
-                <td style="padding:6px 10px">${emp.already_registered ? '<span style="color:var(--success);font-weight:600">Registered</span>' : '<span style="color:var(--text-secondary)">New</span>'}</td>
-              </tr>`).join('')}
+                <td style="padding:6px 10px">${emp.already_registered ? '<span style="color:var(--success);font-weight:600">Registered</span>' : noEmail ? '<span style="color:var(--error)">No email</span>' : '<span style="color:var(--text-secondary)">New</span>'}</td>
+              </tr>`;
+            }).join('')}
             </tbody>
           </table>
         </div>
