@@ -258,17 +258,30 @@ async function fetchZohoPeople(catalystApp) {
     const data = await fetchPage(page);
     const results = data.response?.result || [];
     if (!Array.isArray(results) || results.length === 0) break;
+
+    // Log first record structure for debugging
+    if (page === 1 && results.length > 0) {
+      console.log('[sme] Zoho People sample record:', JSON.stringify(results[0]).slice(0, 500));
+    }
+
     for (const row of results) {
-      const emp = typeof row === 'object' ? (row[Object.keys(row)[0]] || row) : row;
+      // Each result is { "<Zoho_ID>": [ { field data } ] }
+      const key = Object.keys(row)[0];
+      const val = row[key];
+      const emp = Array.isArray(val) ? val[0] : (typeof val === 'object' ? val : row);
+      if (!emp) continue;
+
+      const firstName = emp.FirstName || emp['First Name'] || emp.firstName || '';
+      const lastName = emp.LastName || emp['Last Name'] || emp.lastName || '';
       allEmployees.push({
-        employee_id: emp.EmployeeID || emp.Employeeid || '',
-        first_name: emp.FirstName || emp['First Name'] || '',
-        last_name: emp.LastName || emp['Last Name'] || '',
-        full_name: `${emp.FirstName || emp['First Name'] || ''} ${emp.LastName || emp['Last Name'] || ''}`.trim(),
-        email: emp.EmailID || emp['Email ID'] || emp.Work_Email || '',
-        designation: emp.Designation || emp.JobTitle || emp['Job Title'] || '',
-        department: emp.Department || '',
-        location: emp.Location || emp.Work_Location || ''
+        employee_id: emp.EmployeeID || emp['Employee ID'] || emp.Employeeid || '',
+        first_name: firstName,
+        last_name: lastName,
+        full_name: `${firstName} ${lastName}`.trim() || emp.FullName || emp['Full Name'] || '',
+        email: emp.EmailID || emp['Email ID'] || emp['Email address'] || emp.Work_Email || emp.emailID || '',
+        designation: emp.Designation || emp['Job Title'] || emp.JobTitle || emp.designation || '',
+        department: emp.Department || emp.department || '',
+        location: emp.LocationName || emp.Location || emp.Work_location || emp['Work Location'] || ''
       });
     }
     if (results.length < 200) break;
