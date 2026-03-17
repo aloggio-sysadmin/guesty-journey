@@ -216,7 +216,7 @@ async function fetchZohoPeople(catalystApp) {
   let accessToken;
   try {
     const connector = catalystApp.connection();
-    const connectorDetails = await connector.getConnector('zohopeople');
+    const connectorDetails = await connector.getConnector('peopleconn');
     accessToken = connectorDetails.access_token;
   } catch (err) {
     console.error('[sme] Zoho People connector error:', err.message);
