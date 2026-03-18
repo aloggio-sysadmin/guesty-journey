@@ -193,7 +193,7 @@ export default async function renderChatNew(container) {
       area.innerHTML = `
         <select class="form-control" id="sme-select" style="margin-bottom:12px">
           <option value="">Select an SME...</option>
-          ${smes.map(s => `<option value="${s.sme_id}">${s.full_name} — ${s.role || ''} (${s.interview_status})</option>`).join('')}
+          ${smes.sort((a, b) => a.full_name.localeCompare(b.full_name)).map(s => `<option value="${s.sme_id}">${s.full_name} — ${s.role || ''} (${s.interview_status})</option>`).join('')}
         </select>
         <button class="btn btn-primary" style="width:100%" id="start-existing-btn">Start Session</button>`;
       area.querySelector('#start-existing-btn').addEventListener('click', async () => {
