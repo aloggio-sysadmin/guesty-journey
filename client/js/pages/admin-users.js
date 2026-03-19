@@ -1,6 +1,7 @@
 import { auth as authApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
+import { sortData, thSort, attachSort } from '../utils/table.js';
 
 export default async function renderAdminUsers(container) {
   container.innerHTML = `
@@ -25,18 +26,32 @@ export default async function renderAdminUsers(container) {
 
 async function loadUsers(container) {
   const el = container.querySelector('#users-table-container');
+  const sort = { key: null, dir: 'asc' };
+  let allUsers = [];
   try {
-    const users = await authApi.listUsers();
-    if (!users || !users.length) {
+    allUsers = await authApi.listUsers();
+    renderUsers();
+  } catch (err) {
+    el.innerHTML = `<p style="color:var(--error);padding:16px">${esc(err.message)}</p>`;
+    return;
+  }
+
+  function renderUsers() {
+    if (!allUsers || !allUsers.length) {
       el.innerHTML = '<p style="color:var(--text-secondary);padding:16px">No users found.</p>';
       return;
     }
+    const users = sortData(allUsers, sort.key, sort.dir);
     el.innerHTML = `
       <div class="table-wrap"><table>
         <thead>
           <tr>
-            <th>Name</th><th>Email</th><th>Role</th>
-            <th>Status</th><th>Last Login</th><th>Actions</th>
+            ${thSort(sort, 'full_name',  'Name')}
+            ${thSort(sort, 'email',      'Email')}
+            ${thSort(sort, 'role',       'Role')}
+            ${thSort(sort, 'status',     'Status')}
+            ${thSort(sort, 'last_login', 'Last Login')}
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -45,26 +60,19 @@ async function loadUsers(container) {
               <td>${esc(u.full_name || '—')}</td>
               <td>${esc(u.email)}</td>
               <td><span class="badge badge-blue">${u.role}</span></td>
-              <td><span class="badge ${u.status === 'active' ? 'badge-green' : 'badge-amber'}">
-                ${u.status || 'unknown'}
-              </span></td>
+              <td><span class="badge ${u.status === 'active' ? 'badge-green' : 'badge-amber'}">${u.status || 'unknown'}</span></td>
               <td>${u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}</td>
               <td>
-                <button class="btn btn-sm btn-ghost"
-                  data-action="edit"
-                  data-user='${JSON.stringify({ user_id: u.user_id, full_name: u.full_name || '', email: u.email, role: u.role, status: u.status })}'>
-                  Edit
-                </button>
-                <button class="btn btn-sm btn-ghost"
-                  data-action="reset"
-                  data-user-id="${u.user_id}">
-                  Reset PW
-                </button>
+                <button class="btn btn-sm btn-ghost" data-action="edit"
+                  data-user='${JSON.stringify({ user_id: u.user_id, full_name: u.full_name || '', email: u.email, role: u.role, status: u.status })}'>Edit</button>
+                <button class="btn btn-sm btn-ghost" data-action="reset" data-user-id="${u.user_id}">Reset PW</button>
               </td>
             </tr>
           `).join('')}
         </tbody>
       </table></div>`;
+
+    attachSort(el, sort, renderUsers);
 
     el.addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-action]');
@@ -77,8 +85,6 @@ async function loadUsers(container) {
         await doResetPassword(btn.dataset.userId);
       }
     });
-  } catch (err) {
-    el.innerHTML = `<p style="color:var(--error);padding:16px">${esc(err.message)}</p>`;
   }
 }
 

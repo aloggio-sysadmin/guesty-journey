@@ -1,5 +1,7 @@
 import { sme as smeApi } from '../api.js';
 import { toast } from '../components/toast.js';
+import { sortData, thSort, attachSort } from '../utils/table.js';
+
 export default async function renderSmeDetail(container, params) {
   container.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
   try {
@@ -24,12 +26,24 @@ export default async function renderSmeDetail(container, params) {
       </div>
       <div class="card">
         <div class="card-title">Sessions</div>
-        ${(data.sessions || []).length === 0 ? '<p style="color:var(--text-secondary)">No sessions yet</p>' :
-        `<div class="table-wrap"><table><thead><tr><th>Session</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>
-          ${data.sessions.map(s => `<tr><td><code>${s.session_id}</code></td><td><span class="badge badge-gray">${s.status}</span></td><td>${s.session_date ? new Date(s.session_date).toLocaleDateString() : '-'}</td><td><a href="#/chat/${s.session_id}" class="btn btn-sm btn-ghost">View</a></td></tr>`).join('')}
-        </tbody></table></div>`}
+        <div id="sessions-wrap">
+          ${(data.sessions || []).length === 0
+            ? '<p style="color:var(--text-secondary)">No sessions yet</p>'
+            : renderSessionsTable(data.sessions, { key: null, dir: 'asc' })}
+        </div>
       </div>
     </div>`;
+
+    // Attach sort to sessions table
+    const sort = { key: null, dir: 'asc' };
+    const sessions = data.sessions || [];
+    function refreshSessionsTable() {
+      const sorted = sortData(sessions, sort.key, sort.dir);
+      document.getElementById('sessions-wrap').innerHTML = renderSessionsTable(sorted, sort);
+      attachSort(document.getElementById('sessions-wrap'), sort, refreshSessionsTable);
+    }
+    attachSort(document.getElementById('sessions-wrap'), sort, refreshSessionsTable);
+
     const vBtn = container.querySelector('#validate-btn');
     if (vBtn) vBtn.addEventListener('click', async () => {
       try { await smeApi.validate(data.sme_id); toast('SME validated', 'success'); window.location.reload(); } catch (e) { toast(e.message, 'error'); }
@@ -54,4 +68,21 @@ export default async function renderSmeDetail(container, params) {
       } catch (e) { toast(e.message, 'error'); btn.disabled = false; btn.textContent = 'Delete SME'; }
     });
   } catch (e) { container.innerHTML = `<div class="page-body"><div class="card"><p style="color:var(--error)">${e.message}</p></div></div>`; }
+}
+
+function renderSessionsTable(sessions, sort) {
+  if (!sessions.length) return '<p style="color:var(--text-secondary)">No sessions yet</p>';
+  return `<div class="table-wrap"><table><thead><tr>
+    ${thSort(sort, 'session_id',   'Session')}
+    ${thSort(sort, 'status',       'Status')}
+    ${thSort(sort, 'session_date', 'Date')}
+    <th>Action</th>
+  </tr></thead><tbody>
+    ${sessions.map(s => `<tr>
+      <td><code>${s.session_id}</code></td>
+      <td><span class="badge badge-gray">${s.status}</span></td>
+      <td>${s.session_date ? new Date(s.session_date).toLocaleDateString() : '-'}</td>
+      <td><a href="#/chat/${s.session_id}" class="btn btn-sm btn-ghost">View</a></td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
 }
