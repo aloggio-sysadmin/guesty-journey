@@ -446,24 +446,22 @@ async function fetchZohoPeople(catalystApp, params, body, user, queryParams) {
   });
   console.log('[sme] Active employees:', activeEmployees.length, 'of', allEmployees.length);
 
-  // Filter to approved roles (case-insensitive partial match)
+  // Helper: check if a designation matches a role (handles slash-separated aliases like "Marketing / Digital Marketing")
+  function roleMatches(desig, role) {
+    const d = desig.toLowerCase();
+    const parts = role.toLowerCase().split(/\s*\/\s*/);
+    return parts.some(p => d === p || d.includes(p) || p.includes(d));
+  }
+
+  // Filter to approved roles (case-insensitive partial match, handles slash-separated role aliases)
   const matched = activeEmployees.filter(emp => {
     const desig = (emp.designation || '').toLowerCase();
-    return APPROVED_ROLES.some(role => {
-      const roleLower = role.toLowerCase();
-      return desig === roleLower ||
-        desig.includes(roleLower) ||
-        roleLower.includes(desig);
-    });
+    return APPROVED_ROLES.some(role => roleMatches(desig, role));
   });
 
   // Match each employee to the closest approved role
   for (const emp of matched) {
-    const desig = (emp.designation || '').toLowerCase();
-    emp.matched_role = APPROVED_ROLES.find(role => {
-      const r = role.toLowerCase();
-      return desig === r || desig.includes(r) || r.includes(desig);
-    }) || emp.designation;
+    emp.matched_role = APPROVED_ROLES.find(role => roleMatches(emp.designation || '', role)) || emp.designation;
   }
 
   // Check which employees are already registered as SMEs
