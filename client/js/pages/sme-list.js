@@ -1,13 +1,59 @@
 import { sme as smeApi } from '../api.js';
 import { toast } from '../components/toast.js';
 export default async function renderSmeList(container) {
-  container.innerHTML = `<div class="page-header"><h2>SME Register</h2></div><div class="page-body"><div class="filter-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><select class="form-control" id="status-filter"><option value="">All statuses</option><option value="pending">Pending</option><option value="link_sent">Link Sent</option><option value="in_progress">In Progress</option><option value="completed">Completed</option><option value="validated">Validated</option></select><input class="form-control search-input" id="search" placeholder="Search by name..."><div style="margin-left:auto;display:flex;align-items:center;gap:8px" id="bulk-actions" style="display:none"><span style="font-size:12px;color:var(--text-secondary)" id="selected-count">0 selected</span><button class="btn btn-primary btn-sm" id="bulk-send-btn" disabled>Send Interview Links</button></div></div><div id="sme-table"><div class="loading-center"><div class="spinner"></div></div></div></div>`;
+  container.innerHTML = `
+    <div class="page-header"><h2>SME Register</h2></div>
+    <div class="page-body">
+      <div class="filter-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <input class="form-control search-input" id="search" placeholder="Search by name..." style="min-width:180px">
+        <select class="form-control" id="role-filter"><option value="">All roles</option></select>
+        <select class="form-control" id="dept-filter"><option value="">All departments</option></select>
+        <select class="form-control" id="status-filter">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="link_sent">Link Sent</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="validated">Validated</option>
+        </select>
+        <button class="btn btn-sm" id="clear-filters-btn" style="white-space:nowrap;display:none">Clear filters</button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px" id="bulk-actions" style="display:none">
+          <span style="font-size:12px;color:var(--text-secondary)" id="selected-count">0 selected</span>
+          <button class="btn btn-primary btn-sm" id="bulk-send-btn" disabled>Send Interview Links</button>
+        </div>
+      </div>
+      <div id="sme-table"><div class="loading-center"><div class="spinner"></div></div></div>
+    </div>`;
+
   let allSmes = [];
   const selectedIds = new Set();
 
-  try { allSmes = await smeApi.list(); render(allSmes); } catch (e) { toast(e.message, 'error'); }
-  container.querySelector('#status-filter').addEventListener('change', filter);
+  try {
+    allSmes = await smeApi.list();
+    populateFilterOptions(allSmes);
+    render(allSmes);
+  } catch (e) { toast(e.message, 'error'); }
+
   container.querySelector('#search').addEventListener('input', filter);
+  container.querySelector('#role-filter').addEventListener('change', filter);
+  container.querySelector('#dept-filter').addEventListener('change', filter);
+  container.querySelector('#status-filter').addEventListener('change', filter);
+  container.querySelector('#clear-filters-btn').addEventListener('click', () => {
+    container.querySelector('#search').value = '';
+    container.querySelector('#role-filter').value = '';
+    container.querySelector('#dept-filter').value = '';
+    container.querySelector('#status-filter').value = '';
+    filter();
+  });
+
+  function populateFilterOptions(smes) {
+    const roles = [...new Set(smes.map(s => s.role).filter(Boolean))].sort();
+    const depts = [...new Set(smes.map(s => s.department).filter(Boolean))].sort();
+    const roleSelect = container.querySelector('#role-filter');
+    const deptSelect = container.querySelector('#dept-filter');
+    roles.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; roleSelect.appendChild(o); });
+    depts.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; deptSelect.appendChild(o); });
+  }
 
   // Bulk send button
   container.querySelector('#bulk-send-btn').addEventListener('click', async () => {
@@ -33,7 +79,6 @@ export default async function renderSmeList(container) {
         toast(`Sent ${res.sent} of ${res.total}. ${res.failed} failed.`, 'warning');
         console.warn('[bulk-send] Failures:', failed);
       }
-      // Refresh the list to reflect updated statuses
       selectedIds.clear();
       allSmes = await smeApi.list();
       filter();
@@ -59,14 +104,23 @@ export default async function renderSmeList(container) {
   }
 
   function filter() {
-    const status = container.querySelector('#status-filter').value;
     const search = container.querySelector('#search').value.toLowerCase();
-    render(allSmes.filter(s => (!status || s.interview_status === status) && (!search || s.full_name.toLowerCase().includes(search))));
+    const role = container.querySelector('#role-filter').value;
+    const dept = container.querySelector('#dept-filter').value;
+    const status = container.querySelector('#status-filter').value;
+    const hasFilters = search || role || dept || status;
+    container.querySelector('#clear-filters-btn').style.display = hasFilters ? '' : 'none';
+    render(allSmes.filter(s =>
+      (!search || s.full_name.toLowerCase().includes(search)) &&
+      (!role || s.role === role) &&
+      (!dept || s.department === dept) &&
+      (!status || s.interview_status === status)
+    ));
   }
 
   function render(smes) {
     function statusBadge(status) {
-      const cls = status === 'validated' ? 'badge-green' : status === 'completed' ? 'badge-blue' : status === 'in_progress' ? 'badge-amber' : status === 'link_sent' ? 'badge-amber' : 'badge-gray';
+      const cls = status === 'validated' ? 'badge-green' : status === 'completed' ? 'badge-blue' : ['in_progress', 'link_sent'].includes(status) ? 'badge-amber' : 'badge-gray';
       return `<span class="badge ${cls}">${status}</span>`;
     }
     const hasEmail = (s) => !!(s.contact_json?.email);
@@ -76,7 +130,11 @@ export default async function renderSmeList(container) {
       ${smes.length === 0 ? `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-secondary)">No SMEs found</td></tr>` :
       smes.map(s => `<tr>
         <td><input type="checkbox" class="sme-cb" data-id="${s.sme_id}" ${selectedIds.has(s.sme_id) ? 'checked' : ''} ${!hasEmail(s) ? 'disabled title="No email address"' : ''}></td>
-        <td style="cursor:pointer" onclick="window.location.hash='#/sme/${s.sme_id}'"><code>${s.sme_id}</code></td><td style="cursor:pointer" onclick="window.location.hash='#/sme/${s.sme_id}'"><strong>${s.full_name}</strong></td><td>${s.role || '-'}</td><td>${s.contact_json?.email || '<span style="color:var(--error);font-size:12px">Missing</span>'}</td><td>${s.department || '-'}</td>
+        <td style="cursor:pointer" onclick="window.location.hash='#/sme/${s.sme_id}'"><code>${s.sme_id}</code></td>
+        <td style="cursor:pointer" onclick="window.location.hash='#/sme/${s.sme_id}'"><strong>${s.full_name}</strong></td>
+        <td>${s.role || '-'}</td>
+        <td>${s.contact_json?.email || '<span style="color:var(--error);font-size:12px">Missing</span>'}</td>
+        <td>${s.department || '-'}</td>
         <td>${statusBadge(s.interview_status)}</td>
         <td><button class="btn btn-sm btn-danger delete-sme-btn" data-id="${s.sme_id}" data-name="${s.full_name}">Delete</button></td>
       </tr>`).join('')}
@@ -100,10 +158,8 @@ export default async function renderSmeList(container) {
     document.querySelectorAll('.sme-cb').forEach(cb => {
       cb.addEventListener('change', () => {
         if (cb.checked) { selectedIds.add(cb.dataset.id); } else { selectedIds.delete(cb.dataset.id); }
-        // Update select-all state
         const allCbs = document.querySelectorAll('.sme-cb:not(:disabled)');
-        const allChecked = [...allCbs].every(c => c.checked);
-        if (selectAll) selectAll.checked = allCbs.length > 0 && allChecked;
+        if (selectAll) selectAll.checked = allCbs.length > 0 && [...allCbs].every(c => c.checked);
         updateBulkActions();
       });
     });
