@@ -190,12 +190,31 @@ export default async function renderChatNew(container) {
     if (smes.length === 0) {
       area.innerHTML = '<p style="color:var(--text-secondary);font-size:13px">No SMEs registered yet. Register one using the form first.</p>';
     } else {
+      const sorted = smes.sort((a, b) => a.full_name.localeCompare(b.full_name));
+      const roles = ['', ...new Set(sorted.map(s => s.role).filter(Boolean))].sort();
+
       area.innerHTML = `
+        <select class="form-control" id="role-filter-select" style="margin-bottom:8px">
+          <option value="">All roles</option>
+          ${roles.filter(r => r).map(r => `<option value="${r}">${r}</option>`).join('')}
+        </select>
         <select class="form-control" id="sme-select" style="margin-bottom:12px">
           <option value="">Select an SME...</option>
-          ${smes.sort((a, b) => a.full_name.localeCompare(b.full_name)).map(s => `<option value="${s.sme_id}">${s.full_name} — ${s.role || ''} (${s.interview_status})</option>`).join('')}
+          ${sorted.map(s => `<option value="${s.sme_id}" data-role="${s.role || ''}">${s.full_name} (${s.interview_status})</option>`).join('')}
         </select>
         <button class="btn btn-primary" style="width:100%" id="start-existing-btn">Start Session</button>`;
+
+      // Role filter → narrows SME dropdown
+      area.querySelector('#role-filter-select').addEventListener('change', (e) => {
+        const selectedRole = e.target.value;
+        const smeSelect = area.querySelector('#sme-select');
+        smeSelect.value = '';
+        [...smeSelect.options].forEach(opt => {
+          if (!opt.value) return; // keep placeholder
+          opt.hidden = selectedRole ? opt.dataset.role !== selectedRole : false;
+        });
+      });
+
       area.querySelector('#start-existing-btn').addEventListener('click', async () => {
         const sme_id = area.querySelector('#sme-select').value;
         if (!sme_id) { toast('Please select an SME', 'warning'); return; }
