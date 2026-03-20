@@ -15,7 +15,7 @@ const ALLOWED_TYPES = new Set([
   'image/jpeg'
 ]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const SOP_FOLDER_NAME = 'sop-files';
+const SOP_FOLDER_NAME = 'sop_files';
 
 async function getOrCreateFolder(catalystApp) {
   const filestore = catalystApp.filestore();
