@@ -1,4 +1,4 @@
-import { isLoggedIn } from './auth.js';
+import { isLoggedIn, getUser } from './auth.js';
 import { renderNav } from './components/nav.js';
 
 const routes = {
@@ -89,6 +89,15 @@ async function navigate() {
   try {
     const mod = await routes[match.pattern]();
     mod.default(content, match.params);
+
+    // Trigger admin onboarding walkthrough on first dashboard visit
+    if (hash === '#/dashboard' || hash === '') {
+      const user = getUser();
+      if (user?.role === 'admin' && !localStorage.getItem('admin_walkthrough_seen')) {
+        const { startWalkthrough } = await import('./components/walkthrough.js');
+        setTimeout(() => startWalkthrough(), 500);
+      }
+    }
   } catch (e) {
     console.error('Route load error:', e);
     content.innerHTML = `<div class="page-body"><div class="card"><p style="color:var(--error)">Failed to load page: ${e.message}</p></div></div>`;
