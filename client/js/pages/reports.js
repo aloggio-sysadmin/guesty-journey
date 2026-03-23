@@ -1,6 +1,28 @@
 import { apiCall } from '../api.js';
 import { toast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
+import { startTour } from '../components/walkthrough.js';
+
+const REPORTS_TOUR = [
+  {
+    selector: '.page-header',
+    title: 'Reports',
+    text: 'Generate two types of reports: visual reports that open in a new tab styled for presentation, and data reports that display in a quick summary modal.',
+    position: 'bottom'
+  },
+  {
+    selector: '.page-body h3',
+    title: 'Visual Reports',
+    text: 'Visual reports include journey flow diagrams, swimlane views, technology landscapes, and operational summaries — all formatted for sharing and printing.',
+    position: 'bottom'
+  },
+  {
+    selector: 'button[data-generate]',
+    title: 'Generate a Report',
+    text: 'Click "Generate" on any report card. Visual reports open in a new browser tab; data reports appear in a modal you can print or export.',
+    position: 'top'
+  }
+];
 import { generateTechLandscape } from '../reports/tech-landscape.js';
 import { generateJourneyDiagram } from '../reports/journey-diagram.js';
 import { generateSwimlane } from '../reports/swimlane.js';
@@ -171,6 +193,8 @@ export default function renderReports(container) {
   }
   container._reportClickHandler = handler;
   container.addEventListener('click', handler);
+
+  setTimeout(() => startTour('reports', REPORTS_TOUR), 300);
 }
 
 function showReportModal(report, data) {

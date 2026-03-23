@@ -1,6 +1,29 @@
 import { journey as journeyApi } from '../api.js';
 import { toast } from '../components/toast.js';
+import { startTour } from '../components/walkthrough.js';
+
 const STAGES = ['discovery','booking','pre_arrival','check_in','in_stay','check_out','post_stay','re_engagement'];
+
+const JOURNEY_TOUR = [
+  {
+    selector: '.page-header',
+    title: 'Journey Map Overview',
+    text: 'This page shows the complete guest journey across all 8 stages. Green cards are fully mapped, amber are partially mapped, and grey ones haven\'t been captured yet.',
+    position: 'bottom'
+  },
+  {
+    selector: '.journey-timeline',
+    title: 'Journey Timeline',
+    text: 'Click any stage card to dive into its details — touchpoints, processes, technology, and failure points identified from SME interviews.',
+    position: 'bottom'
+  },
+  {
+    selector: '.card',
+    title: 'Stage Summary Table',
+    text: 'The table below gives a quick count of processes, tech touchpoints, and failure points per stage. Use "Explore" to navigate directly to a stage.',
+    position: 'top'
+  }
+];
 export default async function renderJourneyOverview(container) {
   container.innerHTML = `<div class="page-header"><h2>Journey Map</h2></div><div class="page-body"><div class="loading-center"><div class="spinner"></div></div></div>`;
   try {
@@ -32,4 +55,5 @@ export default async function renderJourneyOverview(container) {
         </tbody></table></div>
       </div>`;
   } catch (e) { toast(e.message, 'error'); }
+  setTimeout(() => startTour('journey', JOURNEY_TOUR), 300);
 }
