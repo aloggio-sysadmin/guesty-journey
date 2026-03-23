@@ -20,6 +20,12 @@ const CHAT_NEW_TOUR = [
     title: 'Start with an Existing SME',
     text: 'Select an already-registered SME and click "Start Session" to begin an AI-guided interview immediately.',
     position: 'left'
+  },
+  {
+    selector: '#import-zoho-btn',
+    title: 'Import from Zoho People',
+    text: 'Fetch approved guest-facing employees from Zoho People and bulk-register them as SMEs. Click "Fetch Employees", select the ones you need, then import.',
+    position: 'top'
   }
 ];
 
