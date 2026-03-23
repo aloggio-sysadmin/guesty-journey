@@ -1,6 +1,28 @@
 import { chat as chatApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { sortData, thSort, attachSort } from '../utils/table.js';
+import { startTour } from '../components/walkthrough.js';
+
+const SESSIONS_TOUR = [
+  {
+    selector: '.page-header',
+    title: 'Interview Sessions',
+    text: 'This page lists all AI-guided interview sessions. Each session captures insights from a subject matter expert across one or more journey stages.',
+    position: 'bottom'
+  },
+  {
+    selector: '.filter-bar',
+    title: 'Filter & Search',
+    text: 'Filter sessions by SME name, journey stage, or status (active, paused, closed). Combine filters to find what you need quickly.',
+    position: 'bottom'
+  },
+  {
+    selector: '#sessions-table-wrap',
+    title: 'Sessions Table',
+    text: 'Click "Resume" to continue an active session, or "View" to review a closed one. Closed sessions can also be deleted here.',
+    position: 'top'
+  }
+];
 
 export default async function renderSessions(container) {
   container.innerHTML = `
@@ -28,6 +50,8 @@ export default async function renderSessions(container) {
     populateStages(sessions);
     renderTable();
   } catch (e) { toast(e.message, 'error'); }
+
+  setTimeout(() => startTour('sessions', SESSIONS_TOUR), 300);
 
   container.querySelector('#search').addEventListener('input', renderTable);
   container.querySelector('#stage-filter').addEventListener('change', renderTable);

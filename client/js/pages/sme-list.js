@@ -1,6 +1,28 @@
 import { sme as smeApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { sortData, thSort, attachSort } from '../utils/table.js';
+import { startTour } from '../components/walkthrough.js';
+
+const SME_TOUR = [
+  {
+    selector: '.page-header',
+    title: 'SME Register',
+    text: 'This is your Subject Matter Expert register. Each SME represents a staff member with knowledge of one or more guest journey stages.',
+    position: 'bottom'
+  },
+  {
+    selector: '.filter-bar',
+    title: 'Filter & Bulk Actions',
+    text: 'Search by name, filter by role, department, or status. Select multiple SMEs to send interview links in bulk.',
+    position: 'bottom'
+  },
+  {
+    selector: '#sme-table',
+    title: 'SME Table',
+    text: 'Click any row to view an SME\'s profile and interview history. Status badges show progress from "Pending" through to "Validated".',
+    position: 'top'
+  }
+];
 
 export default async function renderSmeList(container) {
   container.innerHTML = `
@@ -36,6 +58,8 @@ export default async function renderSmeList(container) {
     populateFilterOptions(allSmes);
     filter();
   } catch (e) { toast(e.message, 'error'); }
+
+  setTimeout(() => startTour('sme', SME_TOUR), 300);
 
   container.querySelector('#search').addEventListener('input', filter);
   container.querySelector('#role-filter').addEventListener('change', filter);

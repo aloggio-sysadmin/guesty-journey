@@ -2,6 +2,34 @@ import { auth as authApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
 import { sortData, thSort, attachSort } from '../utils/table.js';
+import { startTour } from '../components/walkthrough.js';
+
+const ADMIN_USERS_TOUR = [
+  {
+    selector: '.page-header',
+    title: 'User Management',
+    text: 'Manage everyone with access to Journey Agent. Admins have full access; interviewers can run sessions but cannot manage users or settings.',
+    position: 'bottom'
+  },
+  {
+    selector: '#btn-add-user',
+    title: 'Add Individual Users',
+    text: 'Click here to add a new user by entering their name, email, and role. They\'ll receive credentials to access the platform.',
+    position: 'bottom'
+  },
+  {
+    selector: '#btn-import-csv',
+    title: 'Bulk Import via CSV',
+    text: 'Have a list of users? Import them all at once using a CSV file with columns: full_name, email, and role.',
+    position: 'bottom'
+  },
+  {
+    selector: '#users-table-container',
+    title: 'Users Table',
+    text: 'Edit a user\'s role or status at any time, or reset their password. Deactivating a user prevents login without deleting their data.',
+    position: 'top'
+  }
+];
 
 export default async function renderAdminUsers(container) {
   container.innerHTML = `
@@ -22,6 +50,7 @@ export default async function renderAdminUsers(container) {
   container.querySelector('#btn-import-csv').addEventListener('click', () => openCsvImportModal(container));
 
   await loadUsers(container);
+  setTimeout(() => startTour('admin_users', ADMIN_USERS_TOUR), 300);
 }
 
 async function loadUsers(container) {

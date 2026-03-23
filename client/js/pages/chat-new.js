@@ -1,5 +1,27 @@
 import { chat as chatApi, sme as smeApi } from '../api.js';
 import { toast } from '../components/toast.js';
+import { startTour } from '../components/walkthrough.js';
+
+const CHAT_NEW_TOUR = [
+  {
+    selector: '.page-header',
+    title: 'SME Management',
+    text: 'This is your hub for managing Subject Matter Experts and starting interview sessions. You can register new SMEs or launch sessions with existing ones.',
+    position: 'bottom'
+  },
+  {
+    selector: '#new-sme-form',
+    title: 'Register a New SME',
+    text: 'Fill in the expert\'s details here. Selecting a role auto-suggests the relevant journey stages. No session starts yet — you can send an interview link after registering.',
+    position: 'right'
+  },
+  {
+    selector: '#sme-select-area',
+    title: 'Start with an Existing SME',
+    text: 'Select an already-registered SME and click "Start Session" to begin an AI-guided interview immediately.',
+    position: 'left'
+  }
+];
 
 const ROLE_STAGE_MAP = {
   'Regional General Manager':                       ['discovery', 'booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay', 're_engagement'],
@@ -232,6 +254,8 @@ export default async function renderChatNew(container) {
   } catch (e) {
     document.getElementById('sme-select-area').innerHTML = `<p style="color:var(--error)">${e.message}</p>`;
   }
+
+  setTimeout(() => startTour('chat_new', CHAT_NEW_TOUR), 300);
 
   // Register SME form — creates SME only, no session
   container.querySelector('#new-sme-form').addEventListener('submit', async (e) => {

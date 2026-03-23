@@ -1,6 +1,47 @@
 import { project, chat as chatApi } from '../api.js';
 import { progressRing } from '../components/progress-ring.js';
 import { toast } from '../components/toast.js';
+import { getUser } from '../auth.js';
+import { startTour } from '../components/walkthrough.js';
+
+const DASHBOARD_TOUR = [
+  {
+    selector: '.page-header',
+    title: 'Welcome to Journey Agent 👋',
+    text: 'This is your Dashboard. Track project completion, interview progress, and recent sessions at a glance.',
+    position: 'bottom'
+  },
+  {
+    selector: 'a.nav-item[href="#/chat/new"]',
+    title: 'Start an Interview',
+    text: 'Begin a new AI-guided session with a subject matter expert to map their part of the guest journey.',
+    position: 'right'
+  },
+  {
+    selector: 'a.nav-item[href="#/sme"]',
+    title: 'SME Register',
+    text: 'Manage all subject matter experts — track interview status, send interview links, and validate responses.',
+    position: 'right'
+  },
+  {
+    selector: 'a.nav-item[href="#/journey"]',
+    title: 'Journey Map',
+    text: 'Explore the guest journey across all 8 stages, from discovery through re-engagement.',
+    position: 'right'
+  },
+  {
+    selector: 'a.nav-item[href="#/reports"]',
+    title: 'Reports',
+    text: 'Generate data and visual reports: journey maps, gap registers, executive summaries, and more.',
+    position: 'right'
+  },
+  {
+    selector: 'a.nav-item[href="#/admin/users"]',
+    title: 'User Management',
+    text: 'As an admin, you can invite new users, assign roles, and manage platform access.',
+    position: 'right'
+  }
+];
 
 export default async function renderDashboard(container) {
   container.innerHTML = `
@@ -85,5 +126,11 @@ export default async function renderDashboard(container) {
   } catch (err) {
     toast(err.message, 'error');
     document.getElementById('stats-area').innerHTML = `<div class="card"><p style="color:var(--error)">${err.message}</p></div>`;
+  }
+
+  // Show welcome walkthrough for first-time admin login
+  const user = getUser();
+  if (user?.role === 'admin') {
+    setTimeout(() => startTour('dashboard', DASHBOARD_TOUR), 500);
   }
 }
