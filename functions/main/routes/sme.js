@@ -6,6 +6,7 @@ const { generateId } = require('../utils/id-generator');
 const { safeParse, safeStringify } = require('../utils/json-helpers');
 const { validate, smeCreateSchema, smeUpdateSchema } = require('../utils/validators');
 const { getConfig } = require('../config');
+const { getApprovedRoles } = require('../config/journeys');
 
 function parseSme(row) {
   if (!row) return null;
@@ -33,6 +34,7 @@ async function create(catalystApp, params, body, user) {
     role: value.role,
     department: value.department || '',
     location: value.location || '',
+    journey_type: value.journey_type || 'guest',
     contact_json: safeStringify(value.contact_json || {}),
     domains_json: safeStringify(value.domains_json || []),
     journey_stages_owned_json: safeStringify(value.journey_stages_owned_json || []),
@@ -290,18 +292,6 @@ function processResults(results, allEmployees) {
 }
 
 // GET /sme/zoho-people — Fetch employees from Zoho People filtered by approved roles
-const APPROVED_ROLES = [
-  'Regional General Manager',
-  'Holiday / Hotel / Park Manager',
-  'Assistant Holiday Manager, Hotel Operations',
-  'Client Services',
-  'Host / Inspector',
-  'Reservations & Guest Services',
-  'Call Centre Manager',
-  'Trust',
-  'Marketing / Digital Marketing',
-  'Regulatory & Compliance'
-];
 
 async function fetchZohoPeople(catalystApp, params, body, user, queryParams) {
   let accessToken;
@@ -453,6 +443,10 @@ async function fetchZohoPeople(catalystApp, params, body, user, queryParams) {
     return parts.some(p => d === p || d.includes(p) || p.includes(d));
   }
 
+  // Determine journey type from query params and get approved roles
+  const journeyType = (queryParams && queryParams.journey_type) || 'guest';
+  const APPROVED_ROLES = getApprovedRoles(journeyType);
+
   // Filter to approved roles (case-insensitive partial match, handles slash-separated role aliases)
   const matched = activeEmployees.filter(emp => {
     const desig = (emp.designation || '').toLowerCase();
@@ -483,6 +477,7 @@ async function fetchZohoPeople(catalystApp, params, body, user, queryParams) {
     total_employees: allEmployees.length,
     active_employees: activeEmployees.length,
     matched_count: matched.length,
+    journey_type: journeyType,
     approved_roles: APPROVED_ROLES,
     employees: matched,
     // Include sample of all designations for debugging role matching

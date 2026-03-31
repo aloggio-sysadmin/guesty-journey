@@ -1,15 +1,13 @@
 import { smePublic } from '../api.js';
+import { JOURNEYS } from '../config/journeys.js';
 
-const STAGE_LABELS = {
-  discovery: 'Discovery',
-  booking: 'Booking',
-  pre_arrival: 'Pre-arrival',
-  check_in: 'Check-in',
-  in_stay: 'In-stay',
-  check_out: 'Check-out',
-  post_stay: 'Post-stay',
-  re_engagement: 'Re-engagement'
-};
+// Build a unified stage label map from all journeys
+const STAGE_LABELS = {};
+for (const j of Object.values(JOURNEYS)) {
+  for (const s of j.stages) {
+    STAGE_LABELS[s.id] = s.label;
+  }
+}
 
 export default async function renderSmeInterview(container, params) {
   const token = params.token;

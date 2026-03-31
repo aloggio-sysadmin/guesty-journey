@@ -278,7 +278,7 @@ Be concise and business-focused. Respond as JSON: {"reply": "...full summary tex
 
   const messages = [{
     role: 'user',
-    content: `Guest Journey Mapping Project — Executive Summary Data:
+    content: `Journey Mapping Project — Executive Summary Data:
 
 Statistics:
 - SMEs interviewed: ${stats.sme_count}

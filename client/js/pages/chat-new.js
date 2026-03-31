@@ -1,6 +1,7 @@
 import { chat as chatApi, sme as smeApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { startTour } from '../components/walkthrough.js';
+import { JOURNEYS, getJourney, getSelectedJourney, setSelectedJourney, renderJourneySelector } from '../config/journeys.js';
 
 const CHAT_NEW_TOUR = [
   {
@@ -23,36 +24,32 @@ const CHAT_NEW_TOUR = [
   }
 ];
 
-const ROLE_STAGE_MAP = {
-  'Regional General Manager':                       ['discovery', 'booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay', 're_engagement'],
-  'Holiday / Hotel / Park Manager':                 ['discovery', 'booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay', 're_engagement'],
-  'Assistant Holiday Manager, Hotel Operations':    ['booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay'],
-  'Client Services':                                ['discovery', 'booking', 'pre_arrival', 'post_stay', 're_engagement'],
-  'Host / Inspector':                               ['pre_arrival', 'check_in', 'in_stay', 'check_out'],
-  'Reservations & Guest Services':                  ['discovery', 'booking', 'pre_arrival'],
-  'Call Centre Manager':                            ['discovery', 'booking', 'pre_arrival', 'post_stay'],
-  'Trust':                                          ['booking', 'check_out', 'post_stay'],
-  'Marketing / Digital Marketing':                  ['discovery', 're_engagement'],
-  'Regulatory & Compliance':                        ['discovery', 'booking', 'pre_arrival', 'check_in', 'in_stay', 'check_out', 'post_stay', 're_engagement'],
-};
-
-const ROLES = Object.keys(ROLE_STAGE_MAP);
-
-const STAGES = [
-  { id: 'discovery',      label: 'Discovery',      tip: 'Guest researches options, reads reviews, compares properties' },
-  { id: 'booking',        label: 'Booking',         tip: 'Guest selects dates, makes a reservation, receives confirmation' },
-  { id: 'pre_arrival',    label: 'Pre-arrival',     tip: 'Guest receives pre-stay communications, special requests, upsells' },
-  { id: 'check_in',       label: 'Check-in',        tip: 'Guest arrives, identity verification, room assignment, key handover' },
-  { id: 'in_stay',        label: 'In-stay',         tip: 'Guest experience during the stay — housekeeping, concierge, dining, activities' },
-  { id: 'check_out',      label: 'Check-out',       tip: 'Guest settles bill, returns keys, arranges transport, departure' },
-  { id: 'post_stay',      label: 'Post-stay',       tip: 'Guest receives follow-up, review requests, loyalty programme communications' },
-  { id: 're_engagement',  label: 'Re-engagement',   tip: 'Returning guest outreach, special offers, win-back campaigns' },
-];
+function getConfig() {
+  const jType = getSelectedJourney();
+  const journey = getJourney(jType);
+  return {
+    journeyType: jType,
+    journey,
+    ROLE_STAGE_MAP: journey.roleStageMap,
+    ROLES: Object.keys(journey.roleStageMap),
+    STAGES: journey.stages,
+  };
+}
 
 export default async function renderChatNew(container) {
+  let cfg = getConfig();
+
+  function buildRoleOptions() {
+    return cfg.ROLES.map(r => `<option value="${r}">${r}</option>`).join('') + '<option value="__other__">Other</option>';
+  }
+  function buildStageCheckboxes() {
+    return cfg.STAGES.map(s => `<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:normal;color:var(--text-primary);cursor:help" title="${s.tip}"><input type="checkbox" name="stage" value="${s.id}"> ${s.label}</label>`).join('');
+  }
+
   container.innerHTML = `
     <div class="page-header"><h2>SME Management</h2></div>
     <div class="page-body">
+      <div id="journey-selector-area"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px">
         <div class="card">
           <div class="card-title">Register New SME</div>
@@ -62,8 +59,7 @@ export default async function renderChatNew(container) {
             <div class="form-group"><label>Role *</label>
               <select class="form-control" id="sme-role" required>
                 <option value="">Select a role...</option>
-                ${ROLES.map(r => `<option value="${r}">${r}</option>`).join('')}
-                <option value="__other__">Other</option>
+                ${buildRoleOptions()}
               </select>
               <input class="form-control" id="sme-role-other" placeholder="Enter custom role" style="display:none;margin-top:6px">
             </div>
@@ -71,8 +67,8 @@ export default async function renderChatNew(container) {
             <div class="form-group"><label>Email *</label><input class="form-control" type="email" id="sme-email" placeholder="sme@company.com" required></div>
             <div class="form-group"><label>Location</label><input class="form-control" id="sme-loc"></div>
             <div class="form-group"><label>Journey Stages</label>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
-                ${STAGES.map(s => `<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:normal;color:var(--text-primary);cursor:help" title="${s.tip}"><input type="checkbox" name="stage" value="${s.id}"> ${s.label}</label>`).join('')}
+              <div id="stage-checkboxes" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
+                ${buildStageCheckboxes()}
               </div>
             </div>
             <button type="submit" class="btn btn-success" style="width:100%" id="register-btn">Register SME</button>
@@ -89,13 +85,19 @@ export default async function renderChatNew(container) {
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div>
             <div class="card-title">Import from Zoho People</div>
-            <p style="color:var(--text-secondary);font-size:13px;margin:0">Fetch employees in approved guest-facing roles and register them as SMEs.</p>
+            <p style="color:var(--text-secondary);font-size:13px;margin:0">Fetch employees in approved roles for the selected journey and register them as SMEs.</p>
           </div>
           <button class="btn btn-primary" id="import-zoho-btn">Fetch Employees</button>
         </div>
         <div id="zoho-import-area" style="margin-top:16px"></div>
       </div>
     </div>`;
+
+  // Render journey selector pills
+  renderJourneySelector(container.querySelector('#journey-selector-area'), (newType) => {
+    // Re-render the whole page when journey changes
+    renderChatNew(container);
+  });
 
   // Role dropdown → auto-select journey stages
   const roleSelect = container.querySelector('#sme-role');
@@ -104,7 +106,7 @@ export default async function renderChatNew(container) {
     const val = roleSelect.value;
     roleOther.style.display = val === '__other__' ? '' : 'none';
     if (val === '__other__') { roleOther.focus(); return; }
-    const mapped = ROLE_STAGE_MAP[val];
+    const mapped = cfg.ROLE_STAGE_MAP[val];
     if (!mapped) return;
     container.querySelectorAll('input[name="stage"]').forEach(cb => {
       cb.checked = mapped.includes(cb.value);
@@ -118,7 +120,7 @@ export default async function renderChatNew(container) {
     btn.disabled = true; btn.textContent = 'Fetching...';
     area.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
     try {
-      const data = await smeApi.fetchZohoPeople();
+      const data = await smeApi.fetchZohoPeople(cfg.journeyType);
       const employees = data.employees || [];
       if (!employees.length) {
         area.innerHTML = '<p style="color:var(--text-secondary);font-size:13px">No employees found matching approved roles.</p>';
@@ -180,12 +182,13 @@ export default async function renderChatNew(container) {
         let imported = 0;
         for (const emp of selected) {
           try {
-            const stages = ROLE_STAGE_MAP[emp.matched_role] || [];
+            const stages = cfg.ROLE_STAGE_MAP[emp.matched_role] || [];
             await smeApi.create({
               full_name: emp.full_name,
               role: emp.matched_role || emp.designation,
               department: emp.department || '',
               location: emp.location || '',
+              journey_type: cfg.journeyType,
               contact_json: { email: emp.email },
               journey_stages_owned_json: stages,
             });
@@ -270,6 +273,7 @@ export default async function renderChatNew(container) {
         role: roleSelect.value === '__other__' ? roleOther.value : roleSelect.value,
         department: container.querySelector('#sme-dept').value || '',
         location: container.querySelector('#sme-loc').value || '',
+        journey_type: cfg.journeyType,
         contact_json: { email },
         journey_stages_owned_json: stages,
       });

@@ -8,6 +8,7 @@ const { buildSystemPrompt } = require('../prompts/system-prompt');
 const { processExtractions } = require('./extraction-processor');
 const { processConflicts } = require('./conflict-detector');
 const { getConfig } = require('../config');
+const { getFirstStage } = require('../config/journeys');
 
 const MAX_HISTORY_MESSAGES = 20;
 
@@ -23,8 +24,11 @@ async function processMessage(catalystApp, sessionId, userMessage, userId) {
     ? await getByField(catalystApp, 'SMERegister', 'sme_id', session.sme_id)
     : null;
 
+  const journeyType = session.journey_type || (sme && sme.journey_type) || 'guest';
+  const defaultStage = getFirstStage(journeyType);
+
   const conversationState = safeParse(session.conversation_state_json, {
-    current_stage: 'discovery',
+    current_stage: defaultStage,
     topics_covered: [],
     topics_remaining: []
   });
@@ -47,7 +51,7 @@ async function processMessage(catalystApp, sessionId, userMessage, userId) {
   messages.push({ role: 'user', content: userMessage });
 
   // ── STEP 3: Load existing records for context ─────────────────────────
-  const currentStage = conversationState.current_stage || 'discovery';
+  const currentStage = conversationState.current_stage || defaultStage;
   const [existingSystems, existingProcesses, existingGaps] = await Promise.all([
     query(catalystApp, 'SELECT * FROM TechEcosystem'),
     query(catalystApp, `SELECT * FROM ProcessInventory WHERE journey_stage = '${currentStage}'`),
@@ -111,7 +115,8 @@ async function processMessage(catalystApp, sessionId, userMessage, userId) {
     sessionState: conversationState,
     existingRecords,
     openConflicts,
-    openQuestions
+    openQuestions,
+    journeyType
   });
 
   // ── STEP 5: Call Claude ───────────────────────────────────────────────

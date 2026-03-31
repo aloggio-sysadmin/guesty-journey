@@ -2,8 +2,7 @@ import { chat as chatApi } from '../api.js';
 import { renderMessage } from '../components/chat-message.js';
 import { toast } from '../components/toast.js';
 import { showModal, showConfirm } from '../components/modal.js';
-
-const STAGES = ['discovery','booking','pre_arrival','check_in','in_stay','check_out','post_stay','re_engagement'];
+import { getJourney } from '../config/journeys.js';
 
 export default async function renderChat(container, params) {
   const sessionId = params.id;
@@ -19,6 +18,9 @@ export default async function renderChat(container, params) {
 
   const { session, sme, messages, conversation_state } = sessionData;
   const isClosed = session.status === 'closed';
+  const journeyType = session.journey_type || 'guest';
+  const journey = getJourney(journeyType);
+  const STAGES = journey.stages.map(s => s.id);
 
   container.innerHTML = `
     <div class="chat-page">
@@ -31,7 +33,7 @@ export default async function renderChat(container, params) {
           <div class="chat-header-meta">${session.session_id} • ${sme ? sme.full_name : 'Unknown SME'}</div>
         </div>
         <div class="chat-progress">
-          <span style="font-size:12px;color:var(--text-secondary)">${(conversation_state.current_stage || 'discovery').replace(/_/g,' ')}</span>
+          <span style="font-size:12px;color:var(--text-secondary)">${(conversation_state.current_stage || STAGES[0]).replace(/_/g,' ')}</span>
           <div class="chat-progress-bar"><div class="chat-progress-bar-fill" id="progress-fill" style="width:${Math.round((conversation_state.stage_completion_estimate || 0) * 100)}%"></div></div>
           <span id="progress-pct">${Math.round((conversation_state.stage_completion_estimate || 0) * 100)}%</span>
         </div>
