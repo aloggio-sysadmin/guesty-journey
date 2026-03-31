@@ -1,9 +1,14 @@
 'use strict';
 
+const { getJourney, getStageDescriptions, getRoleFocus, getFirstStage } = require('../config/journeys');
+
 /**
- * Build the system prompt for the Guest Journey Mapping Agent.
+ * Build the system prompt for the Journey Mapping Agent.
+ * @param {string} journeyType - 'guest' | 'employee' | 'owner' | 'vendor'
  */
-function buildSystemPrompt({ sme, sessionState, existingRecords, openConflicts, openQuestions }) {
+function buildSystemPrompt({ sme, sessionState, existingRecords, openConflicts, openQuestions, journeyType }) {
+  const jType = journeyType || 'guest';
+  const journey = getJourney(jType);
   const smeInfo = sme ? `${sme.full_name} (${sme.role || ''}, ${sme.department || ''})` : 'Unknown SME';
   const stagesOwned = sme && sme.journey_stages_owned_json
     ? (Array.isArray(sme.journey_stages_owned_json)
@@ -21,40 +26,21 @@ function buildSystemPrompt({ sme, sessionState, existingRecords, openConflicts, 
   const questions = openQuestions || [];
 
   // Build a friendly stage description map for context
-  const STAGE_DESCRIPTIONS = {
-    discovery: 'how guests find and research the property (browsing, reading reviews, comparing options)',
-    booking: 'the reservation process (selecting dates, making a booking, receiving confirmation)',
-    pre_arrival: 'what happens before the guest arrives (pre-stay emails, special requests, upsells)',
-    check_in: 'the arrival experience (greeting, ID verification, room assignment, key handover)',
-    in_stay: 'the guest experience during their stay (housekeeping, dining, activities, requests)',
-    check_out: 'the departure process (settling the bill, returning keys, transport, farewell)',
-    post_stay: 'follow-up after departure (thank-you messages, review requests, feedback)',
-    re_engagement: 'bringing guests back (special offers, loyalty programmes, win-back outreach)'
-  };
+  const STAGE_DESCRIPTIONS = getStageDescriptions(jType);
 
   const stageContextLines = stagesOwned.map(s =>
     `- ${s.replace(/_/g, ' ')}: ${STAGE_DESCRIPTIONS[s] || s}`
   ).join('\n');
 
   // Role-specific focus areas to tailor questions
-  const ROLE_FOCUS = {
-    'Regional General Manager': 'You are speaking with a senior leader who oversees multiple properties. Focus on strategic oversight, cross-property consistency, escalation paths, and how they ensure service quality across locations. Ask about their bird\'s-eye view of the guest experience and where they see the biggest operational challenges.',
-    'Holiday / Hotel / Park Manager': 'You are speaking with someone who manages a property day-to-day. Focus on on-the-ground operations, staff coordination, guest complaints handling, property-specific processes, and how they balance guest satisfaction with operational efficiency.',
-    'Assistant Holiday Manager, Hotel Operations': 'You are speaking with someone who supports property management and handles operational execution. Focus on hands-on processes, staff supervision, daily routines, guest issue resolution, and how they coordinate between departments.',
-    'Client Services': 'You are speaking with someone who is a primary point of contact for guests and property stakeholders. Focus on guest communications, enquiry handling, complaint resolution, pre/post-stay touchpoints, and how they manage guest expectations.',
-    'Host / Inspector': 'You are speaking with someone who physically inspects and prepares properties. Focus on property readiness standards, check-in/check-out inspections, quality assurance, what they look for during walkthroughs, and how they handle issues found on-site.',
-    'Reservations & Guest Services': 'You are speaking with someone who handles bookings and guest enquiries. Focus on the enquiry-to-booking process, channel management (phone, email, OTAs), rate handling, special requests, and how they communicate with guests before arrival.',
-    'Call Centre Manager': 'You are speaking with someone who manages inbound guest communications. Focus on call handling processes, common guest queries, escalation procedures, after-hours protocols, and how they measure service quality.',
-    'Trust': 'You are speaking with someone who handles trust accounting and financial compliance. Focus on trust account processes, payment handling, reconciliation, owner disbursements, financial reporting, and regulatory compliance around guest funds.',
-    'Marketing / Digital Marketing': 'You are speaking with someone who drives guest acquisition and re-engagement. Focus on how guests discover properties, digital channels, listing optimisation, campaign strategies, brand presence, and how they bring past guests back.',
-    'Regulatory & Compliance': 'You are speaking with someone who ensures regulatory adherence. Focus on compliance requirements at each stage, licensing, safety standards, data privacy (guest information handling), and how compliance intersects with the guest experience.',
-  };
-
-  const roleFocus = sme && sme.role && ROLE_FOCUS[sme.role]
-    ? `\nROLE CONTEXT:\n${ROLE_FOCUS[sme.role]}\nTailor your questions to this person's perspective and expertise. Ask about things they would directly know about or be responsible for in their role.\n`
+  const roleFocusText = sme && sme.role ? getRoleFocus(jType, sme.role) : null;
+  const roleFocus = roleFocusText
+    ? `\nROLE CONTEXT:\n${roleFocusText}\nTailor your questions to this person's perspective and expertise. Ask about things they would directly know about or be responsible for in their role.\n`
     : '';
 
-  return `You are a friendly interviewer helping to map the guest journey at a hospitality company. You are speaking directly with a team member (Subject Matter Expert) who works in the business.
+  const defaultStageOrder = journey.stages.map(s => s.id).join(', ');
+
+  return `You are a friendly interviewer helping to map the ${journey.persona} at a hospitality company. You are speaking directly with a team member (Subject Matter Expert) who works in the business.
 ${roleFocus}
 
 YOUR ROLE:
@@ -187,7 +173,7 @@ INTERVIEW FLOW RULES:
 7. For every process, ask: "Is that how it's meant to work, or how it actually happens day-to-day?"
 8. Track stage progress — update stage_completion_estimate (0.0 to 1.0) as you go
 ${stagesOwned.length > 0 ? `9. ONLY cover these stages: ${stagesOwnedList}. When ${stagesOwned.length === 1 ? 'this stage is' : 'ALL assigned stages are'} thoroughly covered, set "interview_complete": true in conversation_state and give a warm thank-you message summarising what you've learned. Do NOT ask more questions after this.
-10. When moving between assigned stages, update current_stage accordingly. Never move to a stage not in the assigned list. Remember to ask for SOP uploads when entering each new stage (rule 1).` : `9. Move through stages in order: discovery, booking, pre_arrival, check_in, in_stay, check_out, post_stay, re_engagement. Remember to ask for SOP uploads when entering each new stage (rule 1).
+10. When moving between assigned stages, update current_stage accordingly. Never move to a stage not in the assigned list. Remember to ask for SOP uploads when entering each new stage (rule 1).` : `9. Move through stages in order: ${defaultStageOrder}. Remember to ask for SOP uploads when entering each new stage (rule 1).
 10. When all stages are covered, set "interview_complete": true and give a warm wrap-up.`}
 11. Be conversational and warm — this is a friendly chat, not an interrogation
 12. Keep your messages concise — no more than 2-3 short paragraphs per reply

@@ -9,6 +9,7 @@ const { processMessage } = require('../services/conversation-engine');
 const { callClaudeForSummary } = require('../services/claude-client');
 const { buildSystemPrompt } = require('../prompts/system-prompt');
 const { getConfig } = require('../config');
+const { getJourney, getFirstStage } = require('../config/journeys');
 
 // POST /chat/start
 async function startSession(catalystApp, params, body, user) {
@@ -35,11 +36,13 @@ async function startSession(catalystApp, params, body, user) {
   const sme = await getByField(catalystApp, 'SMERegister', 'sme_id', sme_id);
   if (!sme) { const e = new Error('SME not found'); e.status = 404; throw e; }
 
-  // Determine initial stage
+  // Determine journey type and initial stage
+  const journeyType = sme.journey_type || 'guest';
+  const journey = getJourney(journeyType);
   const stagesOwned = safeParse(sme.journey_stages_owned_json, []);
   const initialStage = Array.isArray(stagesOwned) && stagesOwned.length > 0
     ? stagesOwned[0]
-    : 'discovery';
+    : getFirstStage(journeyType);
 
   const session_id = await generateId(catalystApp, 'SESSION');
   const now = new Date().toISOString();
@@ -57,6 +60,7 @@ async function startSession(catalystApp, params, body, user) {
   await insert(catalystApp, 'Sessions', {
     session_id,
     sme_id,
+    journey_type: journeyType,
     interviewer_user_id: user ? user.user_id : '',
     date_session: now,
     duration_minutes: 0,
@@ -81,7 +85,8 @@ async function startSession(catalystApp, params, body, user) {
     sessionState: initialState,
     existingRecords: { systems: [], processes: [], gaps: [] },
     openConflicts: [],
-    openQuestions: []
+    openQuestions: [],
+    journeyType
   });
 
   const openingMessages = [{
@@ -90,7 +95,7 @@ async function startSession(catalystApp, params, body, user) {
   }];
 
   // Call Claude for opening message with fallback
-  const fallbackGreeting = `Hi ${sme.full_name}! Welcome to the Guest Journey Mapping interview. I'm here to learn about your experience and expertise.\n\nLet's start with the **${initialStage.replace(/_/g, ' ')}** stage of the guest journey. Can you walk me through what typically happens during this stage from your perspective?`;
+  const fallbackGreeting = `Hi ${sme.full_name}! Welcome to the ${journey.label} Mapping interview. I'm here to learn about your experience and expertise.\n\nLet's start with the **${initialStage.replace(/_/g, ' ')}** stage of the ${journey.persona}. Can you walk me through what typically happens during this stage from your perspective?`;
 
   let reply = fallbackGreeting;
   let claudeResponse = {};
@@ -152,6 +157,7 @@ async function listSessions(catalystApp) {
       session_id: s.session_id,
       sme_id: s.sme_id,
       sme_name,
+      journey_type: s.journey_type || 'guest',
       status: s.status,
       session_date: s.date_session,
       current_stage: state.current_stage || '',
@@ -392,10 +398,12 @@ async function startSmeSession(catalystApp, params, body) {
   const sme = await getByField(catalystApp, 'SMERegister', 'sme_id', sme_id);
   if (!sme) { const e = new Error('SME not found'); e.status = 404; throw e; }
 
+  const journeyType = sme.journey_type || 'guest';
+  const journey = getJourney(journeyType);
   const stagesOwned = safeParse(sme.journey_stages_owned_json, []);
   const initialStage = Array.isArray(stagesOwned) && stagesOwned.length > 0
     ? stagesOwned[0]
-    : 'discovery';
+    : getFirstStage(journeyType);
 
   const session_id = await generateId(catalystApp, 'SESSION');
   const now = new Date().toISOString();
@@ -412,6 +420,7 @@ async function startSmeSession(catalystApp, params, body) {
   await insert(catalystApp, 'Sessions', {
     session_id,
     sme_id,
+    journey_type: journeyType,
     interviewer_user_id: '',
     date_session: now,
     duration_minutes: 0,
@@ -435,7 +444,8 @@ async function startSmeSession(catalystApp, params, body) {
     sessionState: initialState,
     existingRecords: { systems: [], processes: [], gaps: [] },
     openConflicts: [],
-    openQuestions: []
+    openQuestions: [],
+    journeyType
   });
 
   const openingMessages = [{
@@ -444,7 +454,7 @@ async function startSmeSession(catalystApp, params, body) {
   }];
 
   // Call Claude for opening message with fallback
-  const fallbackGreeting = `Hi ${sme.full_name}! Welcome to the Guest Journey Mapping interview. I'm here to learn about your experience and expertise.\n\nLet's start with the **${initialStage.replace(/_/g, ' ')}** stage of the guest journey. Can you walk me through what typically happens during this stage from your perspective?`;
+  const fallbackGreeting = `Hi ${sme.full_name}! Welcome to the ${journey.label} Mapping interview. I'm here to learn about your experience and expertise.\n\nLet's start with the **${initialStage.replace(/_/g, ' ')}** stage of the ${journey.persona}. Can you walk me through what typically happens during this stage from your perspective?`;
 
   let reply = fallbackGreeting;
   let claudeResponse = {};

@@ -4,8 +4,7 @@ const { query, insert, update, getByField } = require('../utils/data-store');
 const { generateId } = require('../utils/id-generator');
 const { safeParse, safeStringify, mergeJsonArrays } = require('../utils/json-helpers');
 const { validate, journeyCreateSchema, journeyUpdateSchema } = require('../utils/validators');
-
-const STAGE_ORDER = ['discovery','booking','pre_arrival','check_in','in_stay','check_out','post_stay','re_engagement'];
+const { getJourney, getAllValidStageIds } = require('../config/journeys');
 
 function parseJourney(row) {
   if (!row) return null;
@@ -53,10 +52,17 @@ async function create(catalystApp, params, body, user) {
 }
 
 // GET /journey
-async function list(catalystApp) {
+async function list(catalystApp, params, body, user, queryParams) {
   const rows = await query(catalystApp, 'SELECT * FROM JourneyMap');
   const parsed = rows.map(parseJourney);
-  parsed.sort((a, b) => STAGE_ORDER.indexOf(a.journey_stage) - STAGE_ORDER.indexOf(b.journey_stage));
+  // Sort using the stage order for the requested journey type
+  const journeyType = (queryParams && queryParams.journey_type) || 'guest';
+  const stageOrder = getJourney(journeyType).stages.map(s => s.id);
+  parsed.sort((a, b) => {
+    const ai = stageOrder.indexOf(a.journey_stage);
+    const bi = stageOrder.indexOf(b.journey_stage);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
   return parsed;
 }
 

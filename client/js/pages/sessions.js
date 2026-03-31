@@ -2,6 +2,7 @@ import { chat as chatApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { sortData, thSort, attachSort } from '../utils/table.js';
 import { startTour } from '../components/walkthrough.js';
+import { getSelectedJourney, renderJourneySelector } from '../config/journeys.js';
 
 const SESSIONS_TOUR = [
   {
@@ -28,6 +29,7 @@ export default async function renderSessions(container) {
   container.innerHTML = `
     <div class="page-header"><h2>Sessions</h2><div class="page-actions"><a href="#/chat/new" class="btn btn-primary">+ New Session</a></div></div>
     <div class="page-body">
+      <div id="journey-selector-area"></div>
       <div class="filter-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <input class="form-control search-input" id="search" placeholder="Search by SME name..." style="min-width:180px">
         <select class="form-control" id="stage-filter"><option value="">All stages</option></select>
@@ -41,6 +43,8 @@ export default async function renderSessions(container) {
       </div>
       <div id="sessions-table-wrap"><div class="loading-center"><div class="spinner"></div></div></div>
     </div>`;
+
+  renderJourneySelector(container.querySelector('#journey-selector-area'), () => renderSessions(container));
 
   let sessions = [];
   const sort = { key: null, dir: 'asc' };

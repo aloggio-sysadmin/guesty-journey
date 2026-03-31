@@ -1,14 +1,13 @@
 import { journey as journeyApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { startTour } from '../components/walkthrough.js';
-
-const STAGES = ['discovery','booking','pre_arrival','check_in','in_stay','check_out','post_stay','re_engagement'];
+import { getJourney, getSelectedJourney, renderJourneySelector } from '../config/journeys.js';
 
 const JOURNEY_TOUR = [
   {
     selector: '.page-header',
     title: 'Journey Map Overview',
-    text: 'This page shows the complete guest journey across all 8 stages. Green cards are fully mapped, amber are partially mapped, and grey ones haven\'t been captured yet.',
+    text: 'This page shows the journey stages. Green cards are fully mapped, amber are partially mapped, and grey ones haven\'t been captured yet.',
     position: 'bottom'
   },
   {
@@ -25,7 +24,11 @@ const JOURNEY_TOUR = [
   }
 ];
 export default async function renderJourneyOverview(container) {
-  container.innerHTML = `<div class="page-header"><h2>Journey Map</h2></div><div class="page-body"><div class="loading-center"><div class="spinner"></div></div></div>`;
+  const journey = getJourney(getSelectedJourney());
+  const STAGES = journey.stages.map(s => s.id);
+
+  container.innerHTML = `<div class="page-header"><h2>Journey Map</h2></div><div class="page-body"><div id="journey-selector-area"></div><div class="loading-center"><div class="spinner"></div></div></div>`;
+  renderJourneySelector(container.querySelector('#journey-selector-area'), () => renderJourneyOverview(container));
   try {
     const stages = await journeyApi.list();
     const map = Object.fromEntries(stages.map(s => [s.journey_stage, s]));

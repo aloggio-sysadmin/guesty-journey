@@ -1,9 +1,13 @@
 import { process as processApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
-const STAGES = ['discovery','booking','pre_arrival','check_in','in_stay','check_out','post_stay','re_engagement'];
+import { getJourney, getSelectedJourney, renderJourneySelector } from '../config/journeys.js';
+
 export default async function renderProcesses(container) {
-  container.innerHTML = `<div class="page-header"><h2>Process Inventory</h2></div><div class="page-body"><div class="filter-bar"><select class="form-control" id="stage-filter"><option value="">All stages</option>${STAGES.map(s=>`<option value="${s}">${s.replace(/_/g,' ')}</option>`).join('')}</select><select class="form-control" id="maturity-filter"><option value="">All maturity</option><option value="ad_hoc">Ad hoc</option><option value="documented">Documented</option><option value="standardised">Standardised</option><option value="optimised">Optimised</option></select></div><div id="process-table"><div class="loading-center"><div class="spinner"></div></div></div></div>`;
+  const journey = getJourney(getSelectedJourney());
+  const STAGES = journey.stages.map(s => s.id);
+  container.innerHTML = `<div class="page-header"><h2>Process Inventory</h2></div><div class="page-body"><div id="journey-selector-area"></div><div class="filter-bar"><select class="form-control" id="stage-filter"><option value="">All stages</option>${STAGES.map(s=>`<option value="${s}">${s.replace(/_/g,' ')}</option>`).join('')}</select><select class="form-control" id="maturity-filter"><option value="">All maturity</option><option value="ad_hoc">Ad hoc</option><option value="documented">Documented</option><option value="standardised">Standardised</option><option value="optimised">Optimised</option></select></div><div id="process-table"><div class="loading-center"><div class="spinner"></div></div></div></div>`;
+  renderJourneySelector(container.querySelector('#journey-selector-area'), () => renderProcesses(container));
   let all = [];
   try { all = await processApi.list(); render(all); } catch (e) { toast(e.message,'error'); }
   container.querySelector('#stage-filter').addEventListener('change', filter);

@@ -1,6 +1,7 @@
 'use strict';
 
 const Joi = require('joi');
+const { getAllValidStageIds } = require('../config/journeys');
 
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -37,13 +38,14 @@ const quickActionSchema = Joi.object({
   record_id: Joi.string().optional()
 });
 
-const JOURNEY_STAGES = ['discovery','booking','pre_arrival','check_in','in_stay','check_out','post_stay','re_engagement'];
+const JOURNEY_STAGES = getAllValidStageIds();
 
 const smeCreateSchema = Joi.object({
   full_name: Joi.string().required(),
   role: Joi.string().required(),
   department: Joi.string().optional().allow(''),
   location: Joi.string().optional().allow(''),
+  journey_type: Joi.string().valid('guest', 'employee', 'owner', 'vendor').optional(),
   contact_json: Joi.alternatives().try(Joi.object(), Joi.string()).optional(),
   domains_json: Joi.alternatives().try(Joi.array(), Joi.string()).optional(),
   journey_stages_owned_json: Joi.alternatives().try(Joi.array(), Joi.string()).optional(),
