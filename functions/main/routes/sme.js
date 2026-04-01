@@ -57,6 +57,9 @@ async function list(catalystApp, params, body, user, queryParams) {
   if (queryParams && queryParams.status) {
     conditions.push(`interview_status = '${queryParams.status}'`);
   }
+  if (queryParams && queryParams.journey_type) {
+    conditions.push(`journey_type = '${queryParams.journey_type}'`);
+  }
   if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
 
   let rows = await query(catalystApp, sql);

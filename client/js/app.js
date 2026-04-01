@@ -1,5 +1,6 @@
 import { isLoggedIn } from './auth.js';
 import { renderNav } from './components/nav.js';
+import { getSelectedJourney, applyJourneyTheme } from './config/journeys.js';
 
 const routes = {
   '#/login':               () => import('./pages/login.js'),
@@ -77,6 +78,7 @@ async function navigate() {
   }
 
   sidebar.style.display = 'flex';
+  applyJourneyTheme(getSelectedJourney());
   renderNav(sidebar);
 
   const match = parseHash(hash);

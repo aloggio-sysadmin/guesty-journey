@@ -115,6 +115,13 @@ export const JOURNEYS = {
 
 export const JOURNEY_TYPES = Object.keys(JOURNEYS);
 
+export const JOURNEY_COLORS = {
+  guest:    { primary: '#2563EB', primaryDark: '#1D4ED8' },
+  employee: { primary: '#0D9488', primaryDark: '#0F766E' },
+  owner:    { primary: '#7C3AED', primaryDark: '#6D28D9' },
+  vendor:   { primary: '#D97706', primaryDark: '#B45309' },
+};
+
 export function getJourney(type) {
   return JOURNEYS[type] || JOURNEYS.guest;
 }
@@ -127,33 +134,12 @@ export function setSelectedJourney(type) {
   localStorage.setItem('selected_journey', type);
 }
 
-/**
- * Renders journey selector pills. Returns the selected journey type.
- * @param {HTMLElement} container - element to prepend the selector into
- * @param {Function} onChange - callback when journey changes
- */
-export function renderJourneySelector(container, onChange) {
-  const current = getSelectedJourney();
-  const bar = document.createElement('div');
-  bar.className = 'journey-selector';
-  bar.style.cssText = 'display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap';
-  bar.innerHTML = JOURNEY_TYPES.map(type => {
-    const j = JOURNEYS[type];
-    const active = type === current;
-    return `<button class="btn btn-sm ${active ? 'btn-primary' : 'btn-ghost'}" data-journey="${type}" style="font-size:12px">${j.label}</button>`;
-  }).join('');
-  container.prepend(bar);
-
-  bar.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const type = btn.dataset.journey;
-      setSelectedJourney(type);
-      bar.querySelectorAll('button').forEach(b => {
-        b.className = `btn btn-sm ${b.dataset.journey === type ? 'btn-primary' : 'btn-ghost'}`;
-      });
-      if (onChange) onChange(type);
-    });
-  });
-
-  return current;
+/** Apply journey-specific color theme by overriding CSS custom properties */
+export function applyJourneyTheme(type) {
+  const colors = JOURNEY_COLORS[type] || JOURNEY_COLORS.guest;
+  const s = document.documentElement.style;
+  s.setProperty('--primary', colors.primary);
+  s.setProperty('--primary-dark', colors.primaryDark);
+  s.setProperty('--sidebar-active', colors.primary);
+  s.setProperty('--user-bubble', colors.primary);
 }

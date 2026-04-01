@@ -4,13 +4,16 @@ const { query } = require('../utils/data-store');
 const { safeParse } = require('../utils/json-helpers');
 const { callClaudeForSummary } = require('../services/claude-client');
 const { getConfig } = require('../config');
+const { getAllStageIds } = require('../config/journeys');
 
 /**
  * POST /reports/journey-map
  * Returns all JourneyMap stages with parsed JSON arrays.
  */
-async function journeyMap(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT stage_id, journey_stage, stage_description, guest_actions_json, frontstage_interactions_json, backstage_processes_json, technology_touchpoints_json, failure_points_json, supporting_sme_ids_json FROM JourneyMap ORDER BY journey_stage');
+async function journeyMap(catalystApp, journeyType) {
+  const validStages = getAllStageIds(journeyType);
+  const allRows = await query(catalystApp, 'SELECT stage_id, journey_stage, stage_description, guest_actions_json, frontstage_interactions_json, backstage_processes_json, technology_touchpoints_json, failure_points_json, supporting_sme_ids_json FROM JourneyMap ORDER BY journey_stage');
+  const rows = allRows.filter(r => validStages.includes(r.journey_stage));
   const stages = rows.map(r => ({
     stage_id: r.stage_id,
     journey_stage: r.journey_stage,
@@ -49,8 +52,10 @@ async function journeyMap(catalystApp) {
  * POST /reports/process-inventory
  * Returns all ProcessInventory records enriched with owner SME name.
  */
-async function processInventory(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT process_id, process_name, journey_stage, sub_stage, maturity, discrepancy_flag, discrepancy_notes, as_documented, as_practiced, steps_json, conflict_flag, owner_sme_id, source_sme_ids_json FROM ProcessInventory ORDER BY journey_stage, process_name');
+async function processInventory(catalystApp, journeyType) {
+  const validStages = getAllStageIds(journeyType);
+  const allRows = await query(catalystApp, 'SELECT process_id, process_name, journey_stage, sub_stage, maturity, discrepancy_flag, discrepancy_notes, as_documented, as_practiced, steps_json, conflict_flag, owner_sme_id, source_sme_ids_json FROM ProcessInventory ORDER BY journey_stage, process_name');
+  const rows = allRows.filter(r => validStages.includes(r.journey_stage));
 
   const smeCache = {};
   const getSme = async (smeId) => {
@@ -100,7 +105,7 @@ async function processInventory(catalystApp) {
  * POST /reports/tech-ecosystem
  * Returns all TechEcosystem records.
  */
-async function techEcosystem(catalystApp) {
+async function techEcosystem(catalystApp, journeyType) {
   const rows = await query(catalystApp, 'SELECT system_id, system_name, vendor, category, environment, integration_links_json, manual_workarounds_json, users_json, source_sme_ids_json FROM TechEcosystem ORDER BY category, system_name');
 
   const systems = rows.map(s => ({
@@ -138,8 +143,10 @@ async function techEcosystem(catalystApp) {
  * POST /reports/gap-opportunity
  * Returns all GapRegister records.
  */
-async function gapOpportunity(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT gap_id, title, description, journey_stage_id, process_id, gap_type, root_cause, frequency, guest_impact, business_impact, financial_impact_estimate, confirmed_by_multiple_smes, status, opportunity_json FROM GapRegister ORDER BY guest_impact DESC, journey_stage_id');
+async function gapOpportunity(catalystApp, journeyType) {
+  const validStages = getAllStageIds(journeyType);
+  const allRows = await query(catalystApp, 'SELECT gap_id, title, description, journey_stage_id, process_id, gap_type, root_cause, frequency, guest_impact, business_impact, financial_impact_estimate, confirmed_by_multiple_smes, status, opportunity_json FROM GapRegister ORDER BY guest_impact DESC, journey_stage_id');
+  const rows = allRows.filter(r => validStages.includes(r.journey_stage_id));
 
   const gaps = rows.map(g => ({
     gap_id: g.gap_id,
@@ -184,7 +191,7 @@ async function gapOpportunity(catalystApp) {
  * POST /reports/conflict-resolution
  * Returns all ConflictLog records with resolution status.
  */
-async function conflictResolution(catalystApp) {
+async function conflictResolution(catalystApp, journeyType) {
   const rows = await query(catalystApp, 'SELECT conflict_id, description, type, sme_a_id, sme_b_id, resolution_status, resolution_notes, resolved_by, created_at FROM ConflictLog ORDER BY resolution_status');
 
   const smeCache = {};
@@ -234,7 +241,7 @@ async function conflictResolution(catalystApp) {
  * POST /reports/executive-summary
  * Calls Claude to generate an AI executive summary.
  */
-async function executiveSummary(catalystApp) {
+async function executiveSummary(catalystApp, journeyType) {
   const config = await getConfig(catalystApp);
 
   // Gather counts in parallel
@@ -326,7 +333,7 @@ Generate a comprehensive executive summary.`
  * POST /reports/tech-landscape
  * Systems grouped by category with journey-stage mapping.
  */
-async function techLandscapeData(catalystApp) {
+async function techLandscapeData(catalystApp, journeyType) {
   const [sysRows, stageRows] = await Promise.all([
     query(catalystApp, 'SELECT system_id, system_name, vendor, category, environment, integration_links_json, manual_workarounds_json, users_json, source_sme_ids_json FROM TechEcosystem ORDER BY category, system_name'),
     query(catalystApp, 'SELECT stage_id, journey_stage, technology_touchpoints_json FROM JourneyMap')
@@ -378,8 +385,10 @@ async function techLandscapeData(catalystApp) {
  * POST /reports/journey-diagram
  * Stages with phase groupings for Mermaid.js flowchart.
  */
-async function journeyDiagramData(catalystApp) {
-  const rows = await query(catalystApp, 'SELECT stage_id, journey_stage, stage_description, guest_actions_json, frontstage_interactions_json, backstage_processes_json, technology_touchpoints_json, failure_points_json, supporting_sme_ids_json FROM JourneyMap ORDER BY ROWID');
+async function journeyDiagramData(catalystApp, journeyType) {
+  const validStages = getAllStageIds(journeyType);
+  const allRows = await query(catalystApp, 'SELECT stage_id, journey_stage, stage_description, guest_actions_json, frontstage_interactions_json, backstage_processes_json, technology_touchpoints_json, failure_points_json, supporting_sme_ids_json FROM JourneyMap ORDER BY ROWID');
+  const rows = allRows.filter(r => validStages.includes(r.journey_stage));
 
   const PHASE_MAP = {
     discovery: ['discovery', 'pre_booking', 'pre-booking'],
@@ -429,7 +438,7 @@ async function journeyDiagramData(catalystApp) {
  * POST /reports/journey-swimlane
  * Full stage data enriched with processes, gaps, and SMEs for swimlane.
  */
-async function swimlaneData(catalystApp) {
+async function swimlaneData(catalystApp, journeyType) {
   const [stageRows, processRows, gapRows, smeRows] = await Promise.all([
     query(catalystApp, 'SELECT stage_id, journey_stage, stage_description, guest_actions_json, frontstage_interactions_json, backstage_processes_json, technology_touchpoints_json, failure_points_json, supporting_sme_ids_json FROM JourneyMap ORDER BY ROWID'),
     query(catalystApp, 'SELECT process_id, process_name, journey_stage, sub_stage, maturity, discrepancy_flag, discrepancy_notes, as_documented, as_practiced, steps_json, conflict_flag, owner_sme_id, source_sme_ids_json FROM ProcessInventory ORDER BY journey_stage'),
@@ -507,7 +516,7 @@ async function swimlaneData(catalystApp) {
  * POST /reports/artefacts-guide
  * Identifies required supporting artefacts based on data gaps.
  */
-async function artefactsGuideData(catalystApp) {
+async function artefactsGuideData(catalystApp, journeyType) {
   const [processRows, gapRows, systemRows, conflictRows] = await Promise.all([
     query(catalystApp, 'SELECT process_id, process_name, journey_stage, sub_stage, maturity, discrepancy_flag, discrepancy_notes, as_documented, as_practiced, steps_json, conflict_flag, owner_sme_id, source_sme_ids_json FROM ProcessInventory'),
     query(catalystApp, 'SELECT gap_id, title, description, journey_stage_id, process_id, gap_type, root_cause, frequency, guest_impact, business_impact, financial_impact_estimate, confirmed_by_multiple_smes, status, opportunity_json FROM GapRegister'),
@@ -669,14 +678,14 @@ async function artefactsGuideData(catalystApp) {
  * POST /reports/operational-report
  * Comprehensive report aggregating ALL data — reuses existing report functions.
  */
-async function operationalReportData(catalystApp) {
+async function operationalReportData(catalystApp, journeyType) {
   const [jm, pi, te, go, cr, es, smeRows] = await Promise.all([
-    journeyMap(catalystApp),
-    processInventory(catalystApp),
-    techEcosystem(catalystApp),
-    gapOpportunity(catalystApp),
-    conflictResolution(catalystApp),
-    executiveSummary(catalystApp),
+    journeyMap(catalystApp, journeyType),
+    processInventory(catalystApp, journeyType),
+    techEcosystem(catalystApp, journeyType),
+    gapOpportunity(catalystApp, journeyType),
+    conflictResolution(catalystApp, journeyType),
+    executiveSummary(catalystApp, journeyType),
     query(catalystApp, 'SELECT sme_id, full_name, department, role, interview_status, journey_stages_owned_json FROM SMERegister')
   ]);
 
@@ -707,13 +716,13 @@ async function operationalReportData(catalystApp) {
  * POST /reports/journey-spreadsheet
  * All data structured for multi-sheet XLSX generation on the client.
  */
-async function journeySpreadsheetData(catalystApp) {
+async function journeySpreadsheetData(catalystApp, journeyType) {
   const [jm, pi, te, go, cr, smeRows] = await Promise.all([
-    journeyMap(catalystApp),
-    processInventory(catalystApp),
-    techEcosystem(catalystApp),
-    gapOpportunity(catalystApp),
-    conflictResolution(catalystApp),
+    journeyMap(catalystApp, journeyType),
+    processInventory(catalystApp, journeyType),
+    techEcosystem(catalystApp, journeyType),
+    gapOpportunity(catalystApp, journeyType),
+    conflictResolution(catalystApp, journeyType),
     query(catalystApp, 'SELECT sme_id, full_name, department, role, interview_status, journey_stages_owned_json, contact_json FROM SMERegister')
   ]);
 
@@ -747,21 +756,22 @@ async function journeySpreadsheetData(catalystApp) {
 /**
  * Dispatcher — called by the router for POST /reports/:type
  */
-async function generate(catalystApp, params) {
+async function generate(catalystApp, params, body) {
   const type = params.type || params.id || '';
+  const journeyType = (body && body.journey_type) || 'guest';
   switch (type) {
-    case 'journey-map':         return journeyMap(catalystApp);
-    case 'process-inventory':   return processInventory(catalystApp);
-    case 'tech-ecosystem':      return techEcosystem(catalystApp);
-    case 'gap-opportunity':     return gapOpportunity(catalystApp);
-    case 'conflict-resolution': return conflictResolution(catalystApp);
-    case 'executive-summary':   return executiveSummary(catalystApp);
-    case 'tech-landscape':      return techLandscapeData(catalystApp);
-    case 'journey-diagram':     return journeyDiagramData(catalystApp);
-    case 'journey-swimlane':    return swimlaneData(catalystApp);
-    case 'artefacts-guide':     return artefactsGuideData(catalystApp);
-    case 'operational-report':  return operationalReportData(catalystApp);
-    case 'journey-spreadsheet': return journeySpreadsheetData(catalystApp);
+    case 'journey-map':         return journeyMap(catalystApp, journeyType);
+    case 'process-inventory':   return processInventory(catalystApp, journeyType);
+    case 'tech-ecosystem':      return techEcosystem(catalystApp, journeyType);
+    case 'gap-opportunity':     return gapOpportunity(catalystApp, journeyType);
+    case 'conflict-resolution': return conflictResolution(catalystApp, journeyType);
+    case 'executive-summary':   return executiveSummary(catalystApp, journeyType);
+    case 'tech-landscape':      return techLandscapeData(catalystApp, journeyType);
+    case 'journey-diagram':     return journeyDiagramData(catalystApp, journeyType);
+    case 'journey-swimlane':    return swimlaneData(catalystApp, journeyType);
+    case 'artefacts-guide':     return artefactsGuideData(catalystApp, journeyType);
+    case 'operational-report':  return operationalReportData(catalystApp, journeyType);
+    case 'journey-spreadsheet': return journeySpreadsheetData(catalystApp, journeyType);
     default: {
       const e = new Error(`Unknown report type: ${type}`);
       e.status = 400;

@@ -1,7 +1,7 @@
 import { chat as chatApi, sme as smeApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { startTour } from '../components/walkthrough.js';
-import { JOURNEYS, getJourney, getSelectedJourney, setSelectedJourney, renderJourneySelector } from '../config/journeys.js';
+import { getJourney, getSelectedJourney } from '../config/journeys.js';
 
 const CHAT_NEW_TOUR = [
   {
@@ -49,7 +49,6 @@ export default async function renderChatNew(container) {
   container.innerHTML = `
     <div class="page-header"><h2>SME Management</h2></div>
     <div class="page-body">
-      <div id="journey-selector-area"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px">
         <div class="card">
           <div class="card-title">Register New SME</div>
@@ -92,12 +91,6 @@ export default async function renderChatNew(container) {
         <div id="zoho-import-area" style="margin-top:16px"></div>
       </div>
     </div>`;
-
-  // Render journey selector pills
-  renderJourneySelector(container.querySelector('#journey-selector-area'), (newType) => {
-    // Re-render the whole page when journey changes
-    renderChatNew(container);
-  });
 
   // Role dropdown → auto-select journey stages
   const roleSelect = container.querySelector('#sme-role');

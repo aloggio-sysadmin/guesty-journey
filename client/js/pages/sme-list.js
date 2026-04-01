@@ -2,7 +2,7 @@ import { sme as smeApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { sortData, thSort, attachSort } from '../utils/table.js';
 import { startTour } from '../components/walkthrough.js';
-import { getSelectedJourney, renderJourneySelector, JOURNEY_TYPES } from '../config/journeys.js';
+import { getSelectedJourney } from '../config/journeys.js';
 
 const SME_TOUR = [
   {
@@ -29,7 +29,6 @@ export default async function renderSmeList(container) {
   container.innerHTML = `
     <div class="page-header"><h2>SME Register</h2></div>
     <div class="page-body">
-      <div id="journey-selector-area"></div>
       <div class="filter-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <input class="form-control search-input" id="search" placeholder="Search by name..." style="min-width:180px">
         <select class="form-control" id="role-filter"><option value="">All roles</option></select>
@@ -51,14 +50,12 @@ export default async function renderSmeList(container) {
       <div id="sme-table"><div class="loading-center"><div class="spinner"></div></div></div>
     </div>`;
 
-  renderJourneySelector(container.querySelector('#journey-selector-area'), () => renderSmeList(container));
-
   let allSmes = [];
   const selectedIds = new Set();
   const sort = { key: null, dir: 'asc' };
 
   try {
-    allSmes = await smeApi.list();
+    allSmes = await smeApi.list('journey_type=' + getSelectedJourney());
     populateFilterOptions(allSmes);
     filter();
   } catch (e) { toast(e.message, 'error'); }
@@ -101,7 +98,7 @@ export default async function renderSmeList(container) {
       if (res.failed === 0) { toast(`Interview links sent to ${res.sent} SME(s)`, 'success'); }
       else { toast(`Sent ${res.sent} of ${res.total}. ${res.failed} failed.`, 'warning'); console.warn('[bulk-send] Failures:', res.results.filter(r => !r.success)); }
       selectedIds.clear();
-      allSmes = await smeApi.list();
+      allSmes = await smeApi.list('journey_type=' + getSelectedJourney());
       filter();
     } catch (err) { toast(err.message, 'error'); }
     btn.disabled = false; btn.textContent = 'Send Interview Links';
