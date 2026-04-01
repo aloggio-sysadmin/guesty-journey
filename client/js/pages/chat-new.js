@@ -172,7 +172,7 @@ export default async function renderChatNew(container) {
         const importBtn = area.querySelector('#zoho-import-selected-btn');
         importBtn.disabled = true; importBtn.textContent = 'Importing...';
         const selected = [...area.querySelectorAll('.zoho-emp-cb:checked')].map(cb => employees[cb.dataset.idx]);
-        let imported = 0;
+        let imported = 0, skipped = 0;
         for (const emp of selected) {
           try {
             const stages = cfg.ROLE_STAGE_MAP[emp.matched_role] || [];
@@ -187,10 +187,14 @@ export default async function renderChatNew(container) {
             });
             imported++;
           } catch (err) {
+            if (err.message && err.message.includes('already exists')) skipped++;
             console.error(`Failed to import ${emp.full_name}:`, err.message);
           }
         }
-        toast(`Imported ${imported} of ${selected.length} employees as SMEs`, 'success');
+        const msg = skipped > 0
+          ? `Imported ${imported} of ${selected.length} SMEs (${skipped} already registered in this journey)`
+          : `Imported ${imported} of ${selected.length} employees as SMEs`;
+        toast(msg, imported > 0 ? 'success' : 'warning');
         // Refresh page to show new SMEs in session dropdown
         renderChatNew(container);
       });
