@@ -143,8 +143,13 @@ async function startSession(catalystApp, params, body, user) {
 }
 
 // GET /chat/sessions
-async function listSessions(catalystApp) {
-  const sessions = await query(catalystApp, 'SELECT * FROM Sessions ORDER BY created_at DESC');
+async function listSessions(catalystApp, params, body, user, queryParams) {
+  let sql = 'SELECT * FROM Sessions';
+  if (queryParams && queryParams.journey_type) {
+    sql += ` WHERE journey_type = '${queryParams.journey_type}'`;
+  }
+  sql += ' ORDER BY created_at DESC';
+  const sessions = await query(catalystApp, sql);
   const result = [];
   for (const s of sessions) {
     let sme_name = '';

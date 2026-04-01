@@ -1,7 +1,7 @@
 import { journey as journeyApi } from '../api.js';
 import { toast } from '../components/toast.js';
 import { startTour } from '../components/walkthrough.js';
-import { getJourney, getSelectedJourney, renderJourneySelector } from '../config/journeys.js';
+import { getJourney, getSelectedJourney } from '../config/journeys.js';
 
 const JOURNEY_TOUR = [
   {
@@ -27,8 +27,7 @@ export default async function renderJourneyOverview(container) {
   const journey = getJourney(getSelectedJourney());
   const STAGES = journey.stages.map(s => s.id);
 
-  container.innerHTML = `<div class="page-header"><h2>Journey Map</h2></div><div class="page-body"><div id="journey-selector-area"></div><div class="loading-center"><div class="spinner"></div></div></div>`;
-  renderJourneySelector(container.querySelector('#journey-selector-area'), () => renderJourneyOverview(container));
+  container.innerHTML = `<div class="page-header"><h2>Journey Map</h2></div><div class="page-body"><div class="loading-center"><div class="spinner"></div></div></div>`;
   try {
     const stages = await journeyApi.list();
     const map = Object.fromEntries(stages.map(s => [s.journey_stage, s]));

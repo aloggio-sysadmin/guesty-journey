@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { query, insert, update, getByField } = require('../utils/data-store');
 const { safeParse, safeStringify } = require('../utils/json-helpers');
 const { getConfig } = require('../config');
+const { getAllStageIds } = require('../config/journeys');
 
 const COUNTER_PREFIXES = ['SME','SESSION','MSG','SYS','PROC','STAGE','GAP','CONF','TP','Q'];
 
@@ -47,21 +48,29 @@ async function getState(catalystApp) {
 }
 
 // POST /project/recalculate
-async function recalculate(catalystApp) {
+async function recalculate(catalystApp, params, body) {
   const config = await getConfig(catalystApp);
+  const journeyType = (body && body.journey_type) || 'guest';
+  const validStages = getAllStageIds(journeyType);
 
   const [
     smeAll, smeInterviewed, smeValidated,
     journeyMapped, processes, gaps, gapsResolved
   ] = await Promise.all([
-    query(catalystApp, 'SELECT * FROM SMERegister'),
-    query(catalystApp, "SELECT * FROM SMERegister WHERE interview_status = 'completed' OR interview_status = 'validated'"),
-    query(catalystApp, "SELECT * FROM SMERegister WHERE interview_status = 'validated'"),
+    query(catalystApp, `SELECT * FROM SMERegister WHERE journey_type = '${journeyType}'`),
+    query(catalystApp, `SELECT * FROM SMERegister WHERE journey_type = '${journeyType}' AND (interview_status = 'completed' OR interview_status = 'validated')`),
+    query(catalystApp, `SELECT * FROM SMERegister WHERE journey_type = '${journeyType}' AND interview_status = 'validated'`),
     query(catalystApp, 'SELECT * FROM JourneyMap'),
     query(catalystApp, 'SELECT * FROM ProcessInventory'),
     query(catalystApp, 'SELECT * FROM GapRegister'),
     query(catalystApp, "SELECT * FROM GapRegister WHERE status = 'resolved'")
   ]);
+
+  // Filter journey/process/gap data by valid stages for this journey
+  const filteredJourneyMapped = journeyMapped.filter(r => validStages.includes(r.journey_stage));
+  const filteredProcesses = processes.filter(r => validStages.includes(r.journey_stage));
+  const filteredGaps = gaps.filter(r => validStages.includes(r.journey_stage_id));
+  const filteredGapsResolved = gapsResolved.filter(r => validStages.includes(r.journey_stage_id));
 
   // ConflictLog query is isolated — table/column may not match ZCQL expectations
   let conflictsOpen = [];
@@ -78,11 +87,11 @@ async function recalculate(catalystApp) {
     smes_identified: smeAll.length,
     smes_interviewed: smeInterviewed.length,
     smes_validated: smeValidated.length,
-    journey_stages_mapped: journeyMapped.length,
-    journey_stages_total: 8,
-    processes_documented: processes.length,
-    gaps_identified: gaps.length,
-    gaps_resolved: gapsResolved.length,
+    journey_stages_mapped: filteredJourneyMapped.length,
+    journey_stages_total: validStages.length,
+    processes_documented: filteredProcesses.length,
+    gaps_identified: filteredGaps.length,
+    gaps_resolved: filteredGapsResolved.length,
     conflicts_open: conflictsOpen.length
   };
 

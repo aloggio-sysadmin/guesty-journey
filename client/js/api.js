@@ -42,7 +42,7 @@ export const auth = {
 
 export const chat = {
   start: (data) => apiCall('POST', '/chat/start', data),
-  listSessions: () => apiCall('GET', '/chat/sessions'),
+  listSessions: (journeyType) => apiCall('GET', `/chat/sessions${journeyType ? '?journey_type=' + journeyType : ''}`),
   getSession: (id) => apiCall('GET', `/chat/${id}`),
   sendMessage: (id, content) => apiCall('POST', `/chat/${id}/message`, { content }),
   quickAction: (id, action, extra = {}) => apiCall('POST', `/chat/${id}/action`, { action, ...extra }),
@@ -102,11 +102,11 @@ export const conflicts = {
 
 export const project = {
   getState: () => apiCall('GET', '/project/state'),
-  recalculate: () => apiCall('POST', '/project/recalculate'),
+  recalculate: (journeyType) => apiCall('POST', '/project/recalculate', journeyType ? { journey_type: journeyType } : null),
 };
 
 export const reports = {
-  generate: (type) => apiCall('POST', `/reports/${type}`),
+  generate: (type, journeyType) => apiCall('POST', `/reports/${type}`, journeyType ? { journey_type: journeyType } : null),
 };
 
 export const smePublic = {

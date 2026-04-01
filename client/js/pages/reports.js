@@ -2,6 +2,7 @@ import { apiCall } from '../api.js';
 import { toast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
 import { startTour } from '../components/walkthrough.js';
+import { getSelectedJourney } from '../config/journeys.js';
 
 const REPORTS_TOUR = [
   {
@@ -171,14 +172,15 @@ export default function renderReports(container) {
 
     try {
       // Check if this is a visual report
+      const journeyType = getSelectedJourney();
       const visualReport = VISUAL_REPORTS.find(r => r.id === reportId);
       if (visualReport) {
-        const data = await apiCall('POST', `/reports/${reportId}`);
+        const data = await apiCall('POST', `/reports/${reportId}`, { journey_type: journeyType });
         await visualReport.handler(data);
       } else {
         // Standard modal report
         const report = REPORTS.find(r => r.id === reportId);
-        const data = await apiCall('POST', `/reports/${reportId}`);
+        const data = await apiCall('POST', `/reports/${reportId}`, { journey_type: journeyType });
         showReportModal(report, data);
       }
     } catch (err) {

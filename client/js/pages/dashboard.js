@@ -3,6 +3,7 @@ import { progressRing } from '../components/progress-ring.js';
 import { toast } from '../components/toast.js';
 import { getUser } from '../auth.js';
 import { startTour } from '../components/walkthrough.js';
+import { getJourney, getSelectedJourney } from '../config/journeys.js';
 
 const DASHBOARD_TOUR = [
   {
@@ -57,13 +58,16 @@ export default async function renderDashboard(container) {
     </div>`;
 
   try {
+    const journeyType = getSelectedJourney();
+    const journeyConfig = getJourney(journeyType);
+    const totalStages = journeyConfig.stages.length;
     const [state, sessions] = await Promise.all([
-      project.recalculate(),
-      chatApi.listSessions()
+      project.recalculate(journeyType),
+      chatApi.listSessions(journeyType)
     ]);
     const c = state.completion || {};
     const smesPct = c.smes_identified ? Math.round((c.smes_interviewed / c.smes_identified) * 100) : 0;
-    const stagesPct = Math.round((c.journey_stages_mapped / 8) * 100);
+    const stagesPct = Math.round((c.journey_stages_mapped / totalStages) * 100);
 
     document.getElementById('stats-area').innerHTML = `
       <div class="stats-grid">
@@ -75,7 +79,7 @@ export default async function renderDashboard(container) {
         <div class="stat-card">
           <div class="stat-label">Journey Stages Mapped</div>
           <div class="stat-value">${c.journey_stages_mapped || 0}</div>
-          <div class="stat-sub">of 8 total stages</div>
+          <div class="stat-sub">of ${totalStages} total stages</div>
         </div>
         <div class="stat-card ${c.gaps_identified > 0 ? 'warning' : ''}">
           <div class="stat-label">Open Gaps</div>
