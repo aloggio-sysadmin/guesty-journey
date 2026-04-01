@@ -25,6 +25,23 @@ async function create(catalystApp, params, body, user) {
   const { error, value } = validate(smeCreateSchema, body);
   if (error) { const e = new Error(error); e.status = 400; throw e; }
 
+  // Enforce one SME per person per journey type
+  const journeyType = value.journey_type || 'guest';
+  const existingSmes = await query(catalystApp, `SELECT full_name, contact_json FROM SMERegister WHERE journey_type = '${journeyType}'`);
+  const email = typeof value.contact_json === 'object' ? (value.contact_json.email || '') : '';
+  const nameLower = (value.full_name || '').toLowerCase();
+  for (const s of existingSmes) {
+    if (nameLower && (s.full_name || '').toLowerCase() === nameLower) {
+      const e = new Error(`SME "${value.full_name}" already exists in the ${journeyType} journey`);
+      e.status = 409; throw e;
+    }
+    const c = safeParse(s.contact_json, {});
+    if (email && c.email && c.email.toLowerCase() === email.toLowerCase()) {
+      const e = new Error(`An SME with email "${email}" already exists in the ${journeyType} journey`);
+      e.status = 409; throw e;
+    }
+  }
+
   const sme_id = await generateId(catalystApp, 'SME');
   const now = new Date().toISOString();
 
@@ -461,8 +478,8 @@ async function fetchZohoPeople(catalystApp, params, body, user, queryParams) {
     emp.matched_role = APPROVED_ROLES.find(role => roleMatches(emp.designation || '', role)) || emp.designation;
   }
 
-  // Check which employees are already registered as SMEs
-  const existingSmes = await query(catalystApp, 'SELECT full_name, contact_json FROM SMERegister');
+  // Check which employees are already registered as SMEs for THIS journey type
+  const existingSmes = await query(catalystApp, `SELECT full_name, contact_json FROM SMERegister WHERE journey_type = '${journeyType}'`);
   const existingEmails = new Set();
   const existingNames = new Set();
   for (const s of existingSmes) {
