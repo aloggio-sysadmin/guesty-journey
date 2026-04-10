@@ -209,12 +209,11 @@ export default async function renderChatNew(container) {
       area.innerHTML = '<p style="color:var(--text-secondary);font-size:13px">No SMEs registered yet. Register one using the form first.</p>';
     } else {
       const sorted = smes.sort((a, b) => a.full_name.localeCompare(b.full_name));
-      const roles = ['', ...new Set(sorted.map(s => s.role).filter(Boolean))].sort();
 
       area.innerHTML = `
         <select class="form-control" id="role-filter-select" style="margin-bottom:8px">
           <option value="">All roles</option>
-          ${roles.filter(r => r).map(r => `<option value="${r}">${r}</option>`).join('')}
+          ${cfg.ROLES.map(r => `<option value="${r}">${r}</option>`).join('')}
         </select>
         <select class="form-control" id="sme-select" style="margin-bottom:12px">
           <option value="">Select an SME...</option>
