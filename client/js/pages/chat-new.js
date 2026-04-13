@@ -70,7 +70,7 @@ export default async function renderChatNew(container) {
                 ${buildStageCheckboxes()}
               </div>
             </div>
-            <button type="submit" class="btn btn-success" style="width:100%" id="register-btn">Register SME</button>
+            <button type="submit" class="btn btn-primary" style="width:100%" id="register-btn">Register SME</button>
           </form>
         </div>
         <div class="card">
@@ -154,7 +154,7 @@ export default async function renderChatNew(container) {
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
           <span style="font-size:12px;color:var(--text-secondary)" id="zoho-selected-count">0 selected</span>
-          <button class="btn btn-success" id="zoho-import-selected-btn" disabled>Import Selected as SMEs</button>
+          <button class="btn btn-primary" id="zoho-import-selected-btn" disabled>Import Selected as SMEs</button>
         </div>`;
 
       // Store employee data for import
